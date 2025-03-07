@@ -1,4 +1,4 @@
-# Staking Contract
+# OkzooV2 Contract
 
 ## Usage
 
