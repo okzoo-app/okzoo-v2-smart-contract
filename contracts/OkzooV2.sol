@@ -7,7 +7,7 @@ import {IOkzooV2} from "./interfaces/IOkzooV2.sol";
 import {EIP712Upgradeable, ECDSAUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 
 contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
-    uint256 private constant SECONDS_IN_A_DAY = 86400; // 1 days
+    uint256 private constant ONE_DAY = 1 days; // 1 days
     // verifier address
     address public verifier;
     // User mapping
@@ -32,7 +32,7 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
     }
 
     function _getDayofTimestamp(uint256 timestamp) private pure returns (uint256) {
-        return timestamp / SECONDS_IN_A_DAY;
+        return timestamp / ONE_DAY;
     }
 
     function checkIn(uint256 _deadline, bytes memory _signature) public {
