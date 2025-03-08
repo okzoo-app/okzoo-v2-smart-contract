@@ -4,7 +4,7 @@ pragma solidity ^0.8.17;
 import {IOkzooV2Errors} from "./interfaces/errors/IOkzooV2Errors.sol";
 import {IOkzooV2} from "./interfaces/IOkzooV2.sol";
 
-import "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
+import {EIP712Upgradeable, ECDSAUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 
 contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
     uint256 private constant SECONDS_IN_A_DAY = 86400; // 1 days
