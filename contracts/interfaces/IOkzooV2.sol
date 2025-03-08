@@ -41,4 +41,6 @@ interface IOkzooV2 {
     function getLastCheckinDate(address user) external view returns (uint256);
 
     function getPendingBonus(address user) external view returns (bool);
+
+    function getStage(address user) external view returns (string memory);
 }

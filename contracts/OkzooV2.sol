@@ -7,7 +7,7 @@ import {IOkzooV2} from "./interfaces/IOkzooV2.sol";
 import "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 
 contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
-    uint256 private constant SECONDS_IN_A_DAY = 86400; // 1 days TODO: Change to 86400
+    uint256 private constant SECONDS_IN_A_DAY = 86400; // 1 days
     // verifier address
     address public verifier;
     // User mapping
@@ -77,7 +77,7 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
         User storage user = users[msg.sender];
         uint256 currentDate = _getDayofTimestamp(block.timestamp);
 
-        if (user.lastCheckinDate == 0 || !user.pendingBonus) {
+        if (user.lastCheckinDate == 0 || user.pendingBonus == false) {
             revert NoBonusAvailable();
         }
 
@@ -120,6 +120,15 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
         return users[user].pendingBonus;
     }
 
+    function getStage(address user) public view returns (string memory) {
+        string[5] memory stageNames = ["Protoform", "Infantile", "Juvenile", "Adolescent", "Prime"];
+        uint256 stageIndex = uint256(users[user].stage);
+        if (stageIndex < stageNames.length) {
+            return stageNames[stageIndex];
+        }
+        return "Unknown";
+    }
+
     function _useNonce(address owner) internal returns (uint256) {
         // For each account, the nonce has an initial value of 0, can only be incremented by one, and cannot be
         // decremented or reset. This guarantees that the nonce never overflows.
@@ -160,7 +169,7 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
         bytes32 digest = _hashTypedDataV4(
             keccak256(
                 abi.encode(
-                    keccak256("EvolveRequest(address user,EvolutionStage stage,uint256 deadline,uint256 nonce)"),
+                    keccak256("EvolveRequest(address user,uint8 stage,uint256 deadline,uint256 nonce)"),
                     _evolveRequest.user,
                     _evolveRequest.stage,
                     _evolveRequest.deadline,

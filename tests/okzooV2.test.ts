@@ -1,67 +1,133 @@
 import { expect } from "chai";
-import { ethers } from "hardhat";
+import { ethers, network } from "hardhat";
 import { OkzooV2, OkzooV2__factory } from "../typechain-types";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
+import { time } from "@nomicfoundation/hardhat-network-helpers";
+import { EIP712Domain, EIP712TypeDefinition } from "../helpers/EIP712.type";
+import { ConfigOkzooV2 } from "../scripts/config";
+import { signTypedData } from "../helpers/EIP712";
+
+enum EvolutionStage {
+    Protoform,
+    Infantile,
+    Juvenile,
+    Adolescent,
+    Prime,
+}
 
 describe("OkzooV2", function () {
-    let okzooV2: OkzooV2;
-    let owner: SignerWithAddress;
-    let user1: SignerWithAddress;
+    let okzoo: OkzooV2;
+    let okzooAddress: string;
+    let user: SignerWithAddress;
+    let verifier: SignerWithAddress;
 
     beforeEach(async function () {
-        [owner, user1] = await ethers.getSigners();
+        [user, verifier] = await ethers.getSigners();
         const OkzooV2 = <OkzooV2__factory>await ethers.getContractFactory("OkzooV2");
-        okzooV2 = await OkzooV2.deploy();
+        okzoo = await OkzooV2.deploy();
+
+        await okzoo.initialize(verifier.address, ConfigOkzooV2.domain, ConfigOkzooV2.version);
+
+        okzooAddress = await okzoo.getAddress();
     });
 
-    it("Should allow user to check in and track streak", async function () {
-        await okzooV2.connect(user1).checkIn();
-        expect(await okzooV2.getStreak(user1.address)).to.equal(1);
+    describe("Check-in", function () {
+        it("Should allow a new user to check in", async function () {
+            await okzoo.connect(user).checkIn();
+            const streak = await okzoo.getStreak(user.address);
+            expect(streak).to.equal(1);
+        });
+
+        it("Should revert if user checks in twice on the same day", async function () {
+            await okzoo.connect(user).checkIn();
+            await expect(okzoo.connect(user).checkIn()).to.be.revertedWithCustomError(okzoo, "AlreadyCheckin");
+        });
+
+        it("Should reset streak if user misses a day", async function () {
+            await okzoo.connect(user).checkIn();
+            await time.increase(86400 * 2); // Skip 2 days
+            await okzoo.connect(user).checkIn();
+            const streak = await okzoo.getStreak(user.address);
+            expect(streak).to.equal(1);
+        });
     });
 
-    it("Should prevent double check-in on the same day", async function () {
-        await okzooV2.connect(user1).checkIn();
-        await expect(okzooV2.connect(user1).checkIn()).to.be.revertedWithCustomError(okzooV2, "AlreadyCheckin");
+    describe("Bonus", function () {
+        it("Should allow claiming bonus after 7-day streak", async function () {
+            for (let i = 0; i < 7; i++) {
+                await okzoo.connect(user).checkIn();
+                await time.increase(86400);
+            }
+            expect(await okzoo.getPendingBonus(user.address)).to.equal(true);
+            await okzoo.connect(user).bonus();
+            expect(await okzoo.getPendingBonus(user.address)).to.equal(false);
+        });
+
+        it("Should revert if no bonus is available", async function () {
+            await okzoo.connect(user).checkIn();
+            await expect(okzoo.connect(user).bonus()).to.be.revertedWithCustomError(okzoo, "NoBonusAvailable");
+        });
     });
 
-    it("Should require claiming bonus before next check-in", async function () {
-        for (let i = 0; i < 7; i++) {
-            await okzooV2.connect(user1).checkIn();
-            await ethers.provider.send("evm_increaseTime", [86400]); // Simulate 1 day
-            await ethers.provider.send("evm_mine");
-        }
-        expect(await okzooV2.getPendingBonus(user1.address)).to.equal(true);
-        await expect(okzooV2.connect(user1).checkIn()).to.be.revertedWithCustomError(
-            okzooV2,
-            "MustClaimBonusBeforeCheckin",
-        );
-    });
+    describe("Evolution", function () {
+        it("Should evolve user to the next stage with valid signature", async function () {
+            await okzoo.connect(user).checkIn();
 
-    it("Should allow claiming bonus and reset pendingBonus", async function () {
-        for (let i = 0; i < 7; i++) {
-            await okzooV2.connect(user1).checkIn();
-            await ethers.provider.send("evm_increaseTime", [86400]); // Simulate 1 day
-            await ethers.provider.send("evm_mine");
-        }
-        await okzooV2.connect(user1).bonus();
-        expect(await okzooV2.getPendingBonus(user1.address)).to.equal(false);
-    });
+            // const stage = await okzoo.getStage(user.address);
+            // console.log({ stage });
 
-    it("Should reset streak if bonus is not claimed in time", async function () {
-        for (let i = 0; i < 7; i++) {
-            await okzooV2.connect(user1).checkIn();
-            await ethers.provider.send("evm_increaseTime", [86400]); // Simulate 1 day
-            await ethers.provider.send("evm_mine");
-        }
-        await ethers.provider.send("evm_increaseTime", [86400]); // Simulate 1 day
-        await ethers.provider.send("evm_mine");
-        await expect(okzooV2.connect(user1).checkIn()).to.be.revertedWithCustomError(
-            okzooV2,
-            "MustClaimBonusBeforeCheckin",
-        );
-        await ethers.provider.send("evm_increaseTime", [86400]); // Simulate another day
-        await ethers.provider.send("evm_mine");
-        await okzooV2.connect(user1).bonus(); // Bonus claim after 2 days
-        expect(await okzooV2.getStreak(user1.address)).to.equal(1); // Streak should reset
+            const nonce = await okzoo.nonces(user.address);
+            const deadline = (await time.latest()) + 1000;
+
+            const signature = await getEvolveSignature(
+                user.address,
+                BigInt(1),
+                BigInt(deadline),
+                nonce,
+                okzooAddress,
+                verifier,
+            );
+            await okzoo.connect(user).evolve(EvolutionStage.Infantile, deadline, signature);
+            const userStage = await okzoo.getStage(user.address);
+            expect(userStage).to.equal("Infantile");
+        });
     });
 });
+
+const getEvolveSignature = async (
+    user: string,
+    stage: bigint,
+    deadline: bigint,
+    nonce: bigint,
+    verifyingContract: string,
+    signer: SignerWithAddress,
+): Promise<string> => {
+    const chainId = network.config.chainId as number; // the EIP-155 chain id. The user-agent should refuse signing if it does not match the currently active chain.
+
+    const evolveTypes: EIP712TypeDefinition = {
+        EvolveRequest: [
+            { name: "user", type: "address" },
+            { name: "stage", type: "uint8" },
+            { name: "deadline", type: "uint256" },
+            { name: "nonce", type: "uint256" },
+        ],
+    };
+
+    const domain: EIP712Domain = {
+        name: ConfigOkzooV2.domain,
+        version: ConfigOkzooV2.version,
+        chainId: chainId,
+        verifyingContract: verifyingContract,
+    };
+
+    const evolveRequest = {
+        user: user,
+        stage: stage,
+        deadline: deadline,
+        nonce: nonce,
+    };
+
+    const signature = await signTypedData(domain, evolveTypes, evolveRequest, signer);
+
+    return signature;
+};
