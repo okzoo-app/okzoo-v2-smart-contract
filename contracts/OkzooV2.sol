@@ -35,7 +35,11 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
         return timestamp / SECONDS_IN_A_DAY;
     }
 
-    function checkIn() public {
+    function checkIn(uint256 _deadline, bytes memory _signature) public {
+        if (!verifyCheckIn(msg.sender, _deadline, _useNonce(msg.sender), _signature)) revert InvalidSignature();
+
+        if (_deadline < block.timestamp) revert DeadlinePassed();
+
         User storage user = users[msg.sender];
         uint256 currentDate = _getDayofTimestamp(block.timestamp);
 
@@ -73,7 +77,11 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
         emit CheckIn(msg.sender, user.streak, block.timestamp);
     }
 
-    function bonus() public onlyUser {
+    function bonus(uint256 _deadline, bytes memory _signature) public onlyUser {
+        if (!verifyCheckIn(msg.sender, _deadline, _useNonce(msg.sender), _signature)) revert InvalidSignature();
+
+        if (_deadline < block.timestamp) revert DeadlinePassed();
+
         User storage user = users[msg.sender];
         uint256 currentDate = _getDayofTimestamp(block.timestamp);
 
@@ -138,6 +146,18 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
         }
     }
 
+    function verifyCheckIn(
+        address _user,
+        uint256 _deadline,
+        uint256 _nonce,
+        bytes memory _signature
+    ) public view returns (bool) {
+        CheckInRequest memory _checkinRequest = CheckInRequest({user: _user, deadline: _deadline, nonce: _nonce});
+
+        address signer = _getSignerForCheckInRequest(_checkinRequest, _signature);
+        return signer == verifier;
+    }
+
     function verifyEvolve(
         address _user,
         EvolutionStage _stage,
@@ -154,6 +174,29 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
 
         address signer = _getSignerForEvolveRequest(_evolveRequest, _signature);
         return signer == verifier;
+    }
+
+    /**
+     * @dev Verify the checkin request with signature
+     *
+     * @param _checkinRequest An checkin request
+     * @param _signature The signature to validate the checkin request
+     */
+    function _getSignerForCheckInRequest(
+        CheckInRequest memory _checkinRequest,
+        bytes memory _signature
+    ) internal view returns (address) {
+        bytes32 digest = _hashTypedDataV4(
+            keccak256(
+                abi.encode(
+                    keccak256("CheckInRequest(address user,uint256 deadline,uint256 nonce)"),
+                    _checkinRequest.user,
+                    _checkinRequest.deadline,
+                    _checkinRequest.nonce
+                )
+            )
+        );
+        return ECDSAUpgradeable.recover(digest, _signature);
     }
 
     /**

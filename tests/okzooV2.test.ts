@@ -31,22 +31,134 @@ describe("OkzooV2", function () {
         okzooAddress = await okzoo.getAddress();
     });
 
+    it("should initialize with the correct verifier", async function () {
+        expect(await okzoo.verifier()).to.equal(verifier.address);
+    });
+
     describe("Check-in", function () {
         it("Should allow a new user to check in", async function () {
-            await okzoo.connect(user).checkIn();
+            const nonce = await okzoo.nonces(user.address);
+            const deadline = (await time.latest()) + 1000;
+
+            const signature = await getCheckInSignature(
+                user.address,
+                BigInt(deadline),
+                BigInt(nonce),
+                okzooAddress,
+                verifier,
+            );
+            await okzoo.connect(user).checkIn(deadline, signature);
             const streak = await okzoo.getStreak(user.address);
             expect(streak).to.equal(1);
         });
 
+        it("should allow user to check-in with valid signature", async function () {
+            const nonce = await okzoo.nonces(user.address);
+            const deadline = (await time.latest()) + 1000;
+
+            const signature = await getCheckInSignature(
+                user.address,
+                BigInt(deadline),
+                BigInt(nonce),
+                okzooAddress,
+                verifier,
+            );
+
+            await okzoo.connect(user).checkIn(deadline, signature);
+            const streak = await okzoo.getStreak(user.address);
+            expect(streak).to.equal(1);
+        });
+
+        it("should not allow check-in with expired deadline", async function () {
+            const nonce = await okzoo.nonces(user.address);
+            const deadline = (await time.latest()) - 1; // Set deadline to the past
+
+            const signature = await getCheckInSignature(
+                user.address,
+                BigInt(deadline),
+                BigInt(nonce),
+                okzooAddress,
+                verifier,
+            );
+
+            await expect(okzoo.connect(user).checkIn(deadline, signature)).to.be.revertedWithCustomError(
+                okzoo,
+                "DeadlinePassed",
+            );
+        });
+
+        it("Should revert if user checks in with duplicate signature", async function () {
+            const nonce = await okzoo.nonces(user.address);
+            const deadline = (await time.latest()) + 1000;
+
+            const signature = await getCheckInSignature(
+                user.address,
+                BigInt(deadline),
+                BigInt(nonce),
+                okzooAddress,
+                verifier,
+            );
+            await okzoo.connect(user).checkIn(deadline, signature);
+
+            await expect(okzoo.connect(user).checkIn(deadline, signature)).to.be.revertedWithCustomError(
+                okzoo,
+                "InvalidSignature",
+            );
+        });
+
         it("Should revert if user checks in twice on the same day", async function () {
-            await okzoo.connect(user).checkIn();
-            await expect(okzoo.connect(user).checkIn()).to.be.revertedWithCustomError(okzoo, "AlreadyCheckin");
+            const nonce = await okzoo.nonces(user.address);
+            const deadline = (await time.latest()) + 1000;
+
+            const signature = await getCheckInSignature(
+                user.address,
+                BigInt(deadline),
+                BigInt(nonce),
+                okzooAddress,
+                verifier,
+            );
+            await okzoo.connect(user).checkIn(deadline, signature);
+            const nonce2 = await okzoo.nonces(user.address);
+            const deadline2 = (await time.latest()) + 1000;
+
+            const signature2 = await getCheckInSignature(
+                user.address,
+                BigInt(deadline2),
+                BigInt(nonce2),
+                okzooAddress,
+                verifier,
+            );
+            await expect(okzoo.connect(user).checkIn(deadline2, signature2)).to.be.revertedWithCustomError(
+                okzoo,
+                "AlreadyCheckin",
+            );
         });
 
         it("Should reset streak if user misses a day", async function () {
-            await okzoo.connect(user).checkIn();
+            const nonce = await okzoo.nonces(user.address);
+            const deadline = (await time.latest()) + 1000;
+
+            const signature = await getCheckInSignature(
+                user.address,
+                BigInt(deadline),
+                BigInt(nonce),
+                okzooAddress,
+                verifier,
+            );
+            await okzoo.connect(user).checkIn(deadline, signature);
             await time.increase(86400 * 2); // Skip 2 days
-            await okzoo.connect(user).checkIn();
+
+            const nonce2 = await okzoo.nonces(user.address);
+            const deadline2 = (await time.latest()) + 1000;
+
+            const signature2 = await getCheckInSignature(
+                user.address,
+                BigInt(deadline2),
+                BigInt(nonce2),
+                okzooAddress,
+                verifier,
+            );
+            await okzoo.connect(user).checkIn(deadline2, signature2);
             const streak = await okzoo.getStreak(user.address);
             expect(streak).to.equal(1);
         });
@@ -55,27 +167,113 @@ describe("OkzooV2", function () {
     describe("Bonus", function () {
         it("Should allow claiming bonus after 7-day streak", async function () {
             for (let i = 0; i < 7; i++) {
-                await okzoo.connect(user).checkIn();
+                const nonce = await okzoo.nonces(user.address);
+                const deadline = (await time.latest()) + 1000;
+
+                const signature = await getCheckInSignature(
+                    user.address,
+                    BigInt(deadline),
+                    BigInt(nonce),
+                    okzooAddress,
+                    verifier,
+                );
+                await okzoo.connect(user).checkIn(deadline, signature);
                 await time.increase(86400);
             }
             expect(await okzoo.getPendingBonus(user.address)).to.equal(true);
-            await okzoo.connect(user).bonus();
+
+            const nonce = await okzoo.nonces(user.address);
+            const deadline = (await time.latest()) + 1000;
+
+            const signature = await getCheckInSignature(
+                user.address,
+                BigInt(deadline),
+                BigInt(nonce),
+                okzooAddress,
+                verifier,
+            );
+
+            await okzoo.connect(user).bonus(deadline, signature);
             expect(await okzoo.getPendingBonus(user.address)).to.equal(false);
         });
 
         it("Should revert if no bonus is available", async function () {
-            await okzoo.connect(user).checkIn();
-            await expect(okzoo.connect(user).bonus()).to.be.revertedWithCustomError(okzoo, "NoBonusAvailable");
+            const nonce = await okzoo.nonces(user.address);
+            const deadline = (await time.latest()) + 1000;
+
+            const signature = await getCheckInSignature(
+                user.address,
+                BigInt(deadline),
+                BigInt(nonce),
+                okzooAddress,
+                verifier,
+            );
+            await okzoo.connect(user).checkIn(deadline, signature);
+
+            const nonce2 = await okzoo.nonces(user.address);
+            const deadline2 = (await time.latest()) + 1000;
+
+            const signature2 = await getCheckInSignature(
+                user.address,
+                BigInt(deadline2),
+                BigInt(nonce2),
+                okzooAddress,
+                verifier,
+            );
+            await expect(okzoo.connect(user).bonus(deadline2, signature2)).to.be.revertedWithCustomError(
+                okzoo,
+                "NoBonusAvailable",
+            );
+        });
+        it("Should revert if user does not exist", async function () {
+            const nonce = await okzoo.nonces(user.address);
+            const deadline = (await time.latest()) + 1000;
+
+            const signature = await getCheckInSignature(
+                user.address,
+                BigInt(deadline),
+                BigInt(nonce),
+                okzooAddress,
+                verifier,
+            );
+
+            await expect(okzoo.connect(user).bonus(deadline, signature)).to.be.revertedWithCustomError(
+                okzoo,
+                "UserDoesNotExist",
+            );
         });
     });
 
     describe("Evolution", function () {
         it("Should evolve user to the next stage with valid signature", async function () {
-            await okzoo.connect(user).checkIn();
+            const nonce = await okzoo.nonces(user.address);
+            const deadline = (await time.latest()) + 1000;
 
-            // const stage = await okzoo.getStage(user.address);
-            // console.log({ stage });
+            const signature = await getCheckInSignature(
+                user.address,
+                BigInt(deadline),
+                BigInt(nonce),
+                okzooAddress,
+                verifier,
+            );
+            await okzoo.connect(user).checkIn(deadline, signature);
 
+            const nonce2 = await okzoo.nonces(user.address);
+            const deadline2 = (await time.latest()) + 1000;
+
+            const signature2 = await getEvolveSignature(
+                user.address,
+                BigInt(1),
+                BigInt(deadline2),
+                nonce2,
+                okzooAddress,
+                verifier,
+            );
+            await okzoo.connect(user).evolve(EvolutionStage.Infantile, deadline2, signature2);
+            const userStage = await okzoo.getStage(user.address);
+            expect(userStage).to.equal("Infantile");
+        });
+        it("Should revert if user does not exist", async function () {
             const nonce = await okzoo.nonces(user.address);
             const deadline = (await time.latest()) + 1000;
 
@@ -83,16 +281,75 @@ describe("OkzooV2", function () {
                 user.address,
                 BigInt(1),
                 BigInt(deadline),
-                nonce,
+                BigInt(nonce),
                 okzooAddress,
                 verifier,
             );
-            await okzoo.connect(user).evolve(EvolutionStage.Infantile, deadline, signature);
-            const userStage = await okzoo.getStage(user.address);
-            expect(userStage).to.equal("Infantile");
+
+            await expect(
+                okzoo.connect(user).evolve(EvolutionStage.Infantile, deadline, signature),
+            ).to.be.revertedWithCustomError(okzoo, "UserDoesNotExist");
+        });
+        it("should not allow evolution without correct signature", async function () {
+            const nonce = await okzoo.nonces(user.address);
+            const deadline = (await time.latest()) + 1000;
+
+            const signature = await getCheckInSignature(
+                user.address,
+                BigInt(deadline),
+                BigInt(nonce),
+                okzooAddress,
+                verifier,
+            );
+            await okzoo.connect(user).checkIn(deadline, signature);
+
+            const deadline2 = (await time.latest()) + 1000;
+
+            const invalidSignature =
+                "0xfc6c39c23082ea2ae5f4e6fd9530762fad051eebd43efd77c26fc38f8cfb07d05730f923f6a79587408ac5e71f7c580e65c7e7932bbe0e6a8a6c4f72357c0fb21b"; // Invalid signature
+
+            await expect(okzoo.connect(user).evolve(1, deadline2, invalidSignature)).to.be.revertedWithCustomError(
+                okzoo,
+                "InvalidSignature",
+            );
         });
     });
 });
+
+const getCheckInSignature = async (
+    user: string,
+    deadline: bigint,
+    nonce: bigint,
+    verifyingContract: string,
+    signer: SignerWithAddress,
+): Promise<string> => {
+    const chainId = network.config.chainId as number; // the EIP-155 chain id. The user-agent should refuse signing if it does not match the currently active chain.
+
+    const checkinTypes: EIP712TypeDefinition = {
+        CheckInRequest: [
+            { name: "user", type: "address" },
+            { name: "deadline", type: "uint256" },
+            { name: "nonce", type: "uint256" },
+        ],
+    };
+
+    const domain: EIP712Domain = {
+        name: ConfigOkzooV2.domain,
+        version: ConfigOkzooV2.version,
+        chainId: chainId,
+        verifyingContract: verifyingContract,
+    };
+
+    const checkinRequest = {
+        user: user,
+        deadline: deadline,
+        nonce: nonce,
+    };
+
+    const signature = await signTypedData(domain, checkinTypes, checkinRequest, signer);
+
+    return signature;
+};
 
 const getEvolveSignature = async (
     user: string,

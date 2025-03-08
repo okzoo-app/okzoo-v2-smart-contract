@@ -9,6 +9,12 @@ interface IOkzooV2 {
         EvolutionStage stage; // evolution stage of user
     }
 
+    struct CheckInRequest {
+        address user;
+        uint256 deadline;
+        uint256 nonce;
+    }
+
     struct EvolveRequest {
         address user;
         EvolutionStage stage;
@@ -28,9 +34,9 @@ interface IOkzooV2 {
     event BonusClaimed(address indexed user, uint256 amount, uint256 timestamp);
     event Evolved(address indexed user, EvolutionStage newStage, uint256 timestamp);
 
-    function checkIn() external;
+    function checkIn(uint256 _deadline, bytes memory _signature) external;
 
-    function bonus() external;
+    function bonus(uint256 _deadline, bytes memory _signature) external;
 
     function evolve(EvolutionStage _stage, uint256 _deadline, bytes memory _signature) external;
 
