@@ -30,6 +30,7 @@ interface IOkzooV2 {
         Prime
     }
 
+    event VerifierChanged(address indexed newVerifier);
     event CheckIn(address indexed user, uint256 streak, uint256 timestamp);
     event BonusClaimed(address indexed user, uint256 amount, uint256 timestamp);
     event Evolved(address indexed user, EvolutionStage newStage, uint256 timestamp);
@@ -48,5 +49,5 @@ interface IOkzooV2 {
 
     function getPendingBonus(address user) external view returns (bool);
 
-    function getStage(address user) external view returns (string memory);
+    function getStage(address user) external view returns (EvolutionStage);
 }

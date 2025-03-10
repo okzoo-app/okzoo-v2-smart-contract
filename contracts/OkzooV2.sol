@@ -4,33 +4,38 @@ pragma solidity ^0.8.17;
 import {IOkzooV2Errors} from "./interfaces/errors/IOkzooV2Errors.sol";
 import {IOkzooV2} from "./interfaces/IOkzooV2.sol";
 
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {EIP712Upgradeable, ECDSAUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 
 /**
  * @title OkzooV2
  * @dev This contract manages user check-ins, bonuses, and evolution stages using EIP-712 signatures for verification.
  */
-contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
+contract OkzooV2 is IOkzooV2, IOkzooV2Errors, OwnableUpgradeable, EIP712Upgradeable {
     uint256 private constant ONE_DAY = 1 days; // 1 days
     // verifier address
     address public verifier;
     // User mapping
     mapping(address => User) public users;
     // Nonce mapping for EIP-712
-    mapping(address account => uint256) public nonces;
+    mapping(address => uint256) public nonces;
 
     /**
-     * @dev Initializes the contract with a verifier address, domain name, and signature version.
+     * @dev Initializes the contract with a owner address, verifier address, domain name, and signature version.
+     * @param initialOwner The address of the initial owner.
      * @param _verifier The address of the verifier.
      * @param domainName The domain name for EIP-712.
      * @param signatureVersion The version of the signature.
      */
     function initialize(
+        address initialOwner,
         address _verifier,
         string memory domainName,
         string memory signatureVersion
     ) public initializer {
+        __Ownable_init();
         __EIP712_init(domainName, signatureVersion);
+        transferOwnership(initialOwner);
         verifier = _verifier;
     }
 
@@ -39,6 +44,16 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
             revert UserDoesNotExist();
         }
         _;
+    }
+
+    /**
+     * @dev Set verifier address
+     * @param _verifier The address of the new verifier.
+     */
+    function setVerifier(address _verifier) external onlyOwner {
+        if (_verifier == address(0)) revert ZeroAddress();
+        verifier = _verifier;
+        emit VerifierChanged(_verifier);
     }
 
     /**
@@ -73,17 +88,19 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
             revert MustClaimBonusBeforeCheckin();
         }
 
-        // if user has never checked in before, set streak to 1 and stage to Protoform
-        if (user.lastCheckinDate == 0) {
-            user.streak = 1;
-            user.stage = EvolutionStage.Protoform;
-        } else {
-            // if user has checked in before, check if it is consecutive day
-            if (_getDayofTimestamp(user.lastCheckinDate) == currentDate - 1) {
-                user.streak += 1;
-            } else {
-                // if user has missed a day, reset streak to 1
+        unchecked {
+            // if user has never checked in before, set streak to 1 and stage to Protoform
+            if (user.lastCheckinDate == 0) {
                 user.streak = 1;
+                user.stage = EvolutionStage.Protoform;
+            } else {
+                // if user has checked in before, check if it is consecutive day
+                if (_getDayofTimestamp(user.lastCheckinDate) == currentDate - 1) {
+                    user.streak += 1;
+                } else {
+                    // if user has missed a day, reset streak to 1
+                    user.streak = 1;
+                }
             }
         }
 
@@ -109,18 +126,9 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
         if (_deadline < block.timestamp) revert DeadlinePassed();
 
         User storage user = users[msg.sender];
-        uint256 currentDate = _getDayofTimestamp(block.timestamp);
 
         if (user.lastCheckinDate == 0 || user.pendingBonus == false) {
             revert NoBonusAvailable();
-        }
-
-        // TODO: why we need to check here when claim bonus? Should check in checkin function only
-
-        // if user has not checked in for more than 1 day, reset streak
-        if (_getDayofTimestamp(user.lastCheckinDate) < currentDate - 1) {
-            user.lastCheckinDate = block.timestamp;
-            user.streak = 1;
         }
 
         user.pendingBonus = false; // reset pending bonus
@@ -145,6 +153,7 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
             revert AlreadyAtHighestStage();
         }
 
+        // just evolve to the next stage
         user.stage = EvolutionStage(uint256(user.stage) + 1);
 
         emit Evolved(msg.sender, user.stage, block.timestamp);
@@ -180,16 +189,10 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
     /**
      * @dev Returns the current stage of the user.
      * @param user The address of the user.
-     * @return The current stage of the user as a string.
+     * @return The current stage of the user.
      */
-    function getStage(address user) public view returns (string memory) {
-        //TODO: why dont we use EvolutionStage enum
-        string[5] memory stageNames = ["Protoform", "Infantile", "Juvenile", "Adolescent", "Prime"];
-        uint256 stageIndex = uint256(users[user].stage);
-        if (stageIndex < stageNames.length) {
-            return stageNames[stageIndex];
-        }
-        return "Unknown";
+    function getStage(address user) public view returns (EvolutionStage) {
+        return users[user].stage;
     }
 
     /**

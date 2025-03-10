@@ -24,7 +24,7 @@ async function main() {
 
     const okzoo = await hre.upgrades.deployProxy(
         OkzooV2,
-        [ConfigOkzooV2.verifier, ConfigOkzooV2.domain, ConfigOkzooV2.version],
+        [ConfigOkzooV2.owner, ConfigOkzooV2.verifier, ConfigOkzooV2.domain, ConfigOkzooV2.version],
         { initializer: "initialize" },
     );
 
