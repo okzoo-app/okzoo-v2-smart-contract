@@ -12,18 +12,12 @@ async function main() {
     const admin = await accounts[0].getAddress();
     //Loading contracts' factory
 
-    const Staking: Staking__factory = await ethers.getContractFactory(
-        "Staking",
-    );
+    const Staking: Staking__factory = await ethers.getContractFactory("Staking");
 
     // Deploy contracts
-    console.log(
-        "==================================================================",
-    );
+    console.log("==================================================================");
     console.log("DEPLOY CONTRACTS");
-    console.log(
-        "==================================================================",
-    );
+    console.log("==================================================================");
 
     console.log("ACCOUNT: " + admin);
     console.log(formatEther(await ethers.provider.getBalance(admin)));

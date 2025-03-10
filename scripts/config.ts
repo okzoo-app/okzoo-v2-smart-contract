@@ -4,7 +4,6 @@ export const ConfigToken = {
     mintAmount: "100000000",
     recipient: "0xe492BE5D1f9C0DA726C560Bc451835AfC5568313",
 };
-
 export const Config = {
     stakeToken: "0x0",
     unstakeLockTime: 604800,
