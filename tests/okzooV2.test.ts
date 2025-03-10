@@ -143,7 +143,7 @@ describe("OkzooV2", function () {
             );
         });
 
-        it("Should reset streak if user misses a day", async function () {
+        it("Should reset streak if user missed a day", async function () {
             const nonce = await okzoo.nonces(user.address);
             const deadline = (await time.latest()) + 1000;
 
@@ -170,6 +170,24 @@ describe("OkzooV2", function () {
             await okzoo.connect(user).checkIn(deadline2, signature2);
             const streak = await okzoo.getStreak(user.address);
             expect(streak).to.equal(1);
+        });
+
+        it("Should return the correct streak if user missed 2 days", async function () {
+            const nonce = await okzoo.nonces(user.address);
+            const deadline = (await time.latest()) + 1000;
+
+            const signature = await getCheckInSignature(
+                user.address,
+                BigInt(deadline),
+                BigInt(nonce),
+                okzooAddress,
+                verifier,
+            );
+            await okzoo.connect(user).checkIn(deadline, signature);
+            await time.increase(86400 * 2); // Skip 2 days
+            
+            const streak = await okzoo.getStreak(user.address);
+            expect(streak).to.equal(0);
         });
     });
 
