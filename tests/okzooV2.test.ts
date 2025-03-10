@@ -185,7 +185,7 @@ describe("OkzooV2", function () {
             );
             await okzoo.connect(user).checkIn(deadline, signature);
             await time.increase(86400 * 2); // Skip 2 days
-            
+
             const streak = await okzoo.getStreak(user.address);
             expect(streak).to.equal(0);
         });

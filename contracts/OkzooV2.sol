@@ -167,7 +167,7 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, OwnableUpgradeable, EIP712Upgradea
     function getStreak(address user) public view returns (uint256) {
         uint256 currentDate = _getDayofTimestamp(block.timestamp);
         uint256 lastCheckinDate = _getDayofTimestamp(users[user].lastCheckinDate);
-        if(lastCheckinDate < currentDate - 1) {
+        if (lastCheckinDate < currentDate - 1) {
             return 0;
         }
         return users[user].streak;
