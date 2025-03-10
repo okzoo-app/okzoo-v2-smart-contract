@@ -6,6 +6,10 @@ import {IOkzooV2} from "./interfaces/IOkzooV2.sol";
 
 import {EIP712Upgradeable, ECDSAUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 
+/**
+ * @title OkzooV2
+ * @dev This contract manages user check-ins, bonuses, and evolution stages using EIP-712 signatures for verification.
+ */
 contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
     uint256 private constant ONE_DAY = 1 days; // 1 days
     // verifier address
@@ -15,6 +19,12 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
     // Nonce mapping for EIP-712
     mapping(address account => uint256) public nonces;
 
+    /**
+     * @dev Initializes the contract with a verifier address, domain name, and signature version.
+     * @param _verifier The address of the verifier.
+     * @param domainName The domain name for EIP-712.
+     * @param signatureVersion The version of the signature.
+     */
     function initialize(
         address _verifier,
         string memory domainName,
@@ -31,10 +41,21 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
         _;
     }
 
+    /**
+     * @dev Returns the day of the given timestamp.
+     * @param timestamp The timestamp to convert.
+     * @return The day of the timestamp.
+     */
     function _getDayofTimestamp(uint256 timestamp) private pure returns (uint256) {
         return timestamp / ONE_DAY;
     }
 
+    /**
+     * @dev Allows a user to check in, updating their streak and stage if applicable.
+     *      User must claim the bonnus before checkin
+     * @param _deadline The deadline for the check-in. A request send after the deadline will throw an error.
+     * @param _signature The signature for verification.
+     */
     function checkIn(uint256 _deadline, bytes memory _signature) public {
         if (!verifyCheckIn(msg.sender, _deadline, _useNonce(msg.sender), _signature)) revert InvalidSignature();
 
@@ -77,6 +98,11 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
         emit CheckIn(msg.sender, user.streak, block.timestamp);
     }
 
+    /**
+     * @dev Allows a user to claim their bonus if available.
+     * @param _deadline The deadline for claiming the bonus.
+     * @param _signature The signature for verification.
+     */
     function bonus(uint256 _deadline, bytes memory _signature) public onlyUser {
         if (!verifyCheckIn(msg.sender, _deadline, _useNonce(msg.sender), _signature)) revert InvalidSignature();
 
@@ -89,6 +115,8 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
             revert NoBonusAvailable();
         }
 
+        // TODO: why we need to check here when claim bonus? Should check in checkin function only
+
         // if user has not checked in for more than 1 day, reset streak
         if (_getDayofTimestamp(user.lastCheckinDate) < currentDate - 1) {
             user.lastCheckinDate = block.timestamp;
@@ -100,6 +128,12 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
         emit BonusClaimed(msg.sender, 1, block.timestamp);
     }
 
+    /**
+     * @dev Allows a user to evolve to the next stage if applicable.
+     * @param _stage The stage to evolve to.
+     * @param _deadline The deadline for the evolution.
+     * @param _signature The signature for verification.
+     */
     function evolve(EvolutionStage _stage, uint256 _deadline, bytes memory _signature) public onlyUser {
         if (!verifyEvolve(msg.sender, _stage, _deadline, _useNonce(msg.sender), _signature)) revert InvalidSignature();
 
@@ -116,19 +150,40 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
         emit Evolved(msg.sender, user.stage, block.timestamp);
     }
 
+    /**
+     * @dev Returns the current streak of the user.
+     * @param user The address of the user.
+     * @return The current streak of the user.
+     */
     function getStreak(address user) public view returns (uint256) {
         return users[user].streak;
     }
 
+    /**
+     * @dev Returns the last check-in date of the user.
+     * @param user The address of the user.
+     * @return The last check-in date of the user.
+     */
     function getLastCheckinDate(address user) public view returns (uint256) {
         return users[user].lastCheckinDate;
     }
 
+    /**
+     * @dev Returns whether the user has a pending bonus.
+     * @param user The address of the user.
+     * @return True if the user has a pending bonus, false otherwise.
+     */
     function getPendingBonus(address user) public view returns (bool) {
         return users[user].pendingBonus;
     }
 
+    /**
+     * @dev Returns the current stage of the user.
+     * @param user The address of the user.
+     * @return The current stage of the user as a string.
+     */
     function getStage(address user) public view returns (string memory) {
+        //TODO: why dont we use EvolutionStage enum
         string[5] memory stageNames = ["Protoform", "Infantile", "Juvenile", "Adolescent", "Prime"];
         uint256 stageIndex = uint256(users[user].stage);
         if (stageIndex < stageNames.length) {
@@ -137,6 +192,11 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
         return "Unknown";
     }
 
+    /**
+     * @dev Uses and increments the nonce for the given owner.
+     * @param owner The address of the owner.
+     * @return The current nonce before incrementing.
+     */
     function _useNonce(address owner) internal returns (uint256) {
         // For each account, the nonce has an initial value of 0, can only be incremented by one, and cannot be
         // decremented or reset. This guarantees that the nonce never overflows.
@@ -146,6 +206,14 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
         }
     }
 
+    /**
+     * @dev Verifies the check-in request with the given signature.
+     * @param _user The address of the user.
+     * @param _deadline The deadline for the check-in.
+     * @param _nonce The nonce for the check-in.
+     * @param _signature The signature to validate the check-in request.
+     * @return True if the signature is valid, false otherwise.
+     */
     function verifyCheckIn(
         address _user,
         uint256 _deadline,
@@ -158,6 +226,15 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, EIP712Upgradeable {
         return signer == verifier;
     }
 
+    /**
+     * @dev Verifies the evolve request with the given signature.
+     * @param _user The address of the user.
+     * @param _stage The stage to evolve to.
+     * @param _deadline The deadline for the evolution.
+     * @param _nonce The nonce for the evolution.
+     * @param _signature The signature to validate the evolve request.
+     * @return True if the signature is valid, false otherwise.
+     */
     function verifyEvolve(
         address _user,
         EvolutionStage _stage,
