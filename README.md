@@ -14,14 +14,6 @@ Then, proceed with installing dependencies:
 $ yarn install
 ```
 
-### Compile
-
-Compile the smart contracts with Hardhat:
-
-```sh
-$ yarn compile
-```
-
 ### TypeChain
 
 Compile the smart contracts and generate TypeChain bindings:
