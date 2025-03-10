@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 // eslint.config.js
 
 const js = require("@eslint/js");
@@ -22,6 +23,6 @@ module.exports = [
             ...ts.configs.recommended.rules,
             "prettier/prettier": ["error", { endOfLine: "auto" }],
         },
-        ignores: ["*.config.js"],
+        ignores: ["*.config.js", "typechain-types/**"],
     },
 ];
