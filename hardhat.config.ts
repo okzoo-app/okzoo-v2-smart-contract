@@ -84,7 +84,9 @@ const config: HardhatUserConfig = {
             accounts: [`${process.env.PRIVATE_KEY}`],
         },
         bsc: {
-            url: `https://thrumming-aged-friday.bsc.quiknode.pro/782e14349ccbf2b4c8c82024abcc5fda15e26f52/`,
+            // url: `https://thrumming-aged-friday.bsc.quiknode.pro/782e14349ccbf2b4c8c82024abcc5fda15e26f52/`,
+            // url: `https://binance.llamarpc.com`,
+            url: `https://rpc.ankr.com/bsc`,
             accounts: [`${process.env.PRIVATE_KEY}`],
         },
     },
@@ -106,6 +108,14 @@ const config: HardhatUserConfig = {
             mantle: `${process.env.MANTLE_SEPOLIA_KEY}`,
         },
         customChains: [
+            {
+                network: "bsc",
+                chainId: 0x38,
+                urls: {
+                    apiURL: "https://api.bscscan.com/api",
+                    browserURL: "https://bscscan.com",
+                },
+            },
             {
                 network: "arbitrum_sepolia",
                 chainId: 421614,
