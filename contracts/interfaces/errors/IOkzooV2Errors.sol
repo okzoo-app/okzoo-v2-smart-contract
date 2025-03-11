@@ -9,4 +9,5 @@ interface IOkzooV2Errors {
     error AlreadyAtHighestStage();
     error InvalidSignature();
     error DeadlinePassed();
+    error ZeroAddress();
 }

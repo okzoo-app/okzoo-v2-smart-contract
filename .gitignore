@@ -136,3 +136,4 @@ artifacts/
 .DS_Store
 contracts.json
 contracts-okzoo.json
+.early.coverage

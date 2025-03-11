@@ -18,21 +18,30 @@ enum EvolutionStage {
 describe("OkzooV2", function () {
     let okzoo: OkzooV2;
     let okzooAddress: string;
+    let owner: SignerWithAddress;
+    let owner2: SignerWithAddress;
     let user: SignerWithAddress;
     let verifier: SignerWithAddress;
 
     beforeEach(async function () {
-        [user, verifier] = await ethers.getSigners();
+        [owner, owner2, user, verifier] = await ethers.getSigners();
         const OkzooV2 = <OkzooV2__factory>await ethers.getContractFactory("OkzooV2");
         okzoo = await OkzooV2.deploy();
 
-        await okzoo.initialize(verifier.address, ConfigOkzooV2.domain, ConfigOkzooV2.version);
+        await okzoo.initialize(owner.address, verifier.address, ConfigOkzooV2.domain, ConfigOkzooV2.version);
 
         okzooAddress = await okzoo.getAddress();
     });
 
     it("should initialize with the correct verifier", async function () {
         expect(await okzoo.verifier()).to.equal(verifier.address);
+    });
+    it("should initialize with the correct owner", async function () {
+        expect(await okzoo.owner()).to.equal(owner.address);
+    });
+    it("should set verifier with the correct address", async function () {
+        await okzoo.connect(owner).setVerifier(owner2.address);
+        expect(await okzoo.verifier()).to.equal(owner2.address);
     });
 
     describe("Check-in", function () {
@@ -134,7 +143,7 @@ describe("OkzooV2", function () {
             );
         });
 
-        it("Should reset streak if user misses a day", async function () {
+        it("Should reset streak if user missed a day", async function () {
             const nonce = await okzoo.nonces(user.address);
             const deadline = (await time.latest()) + 1000;
 
@@ -161,6 +170,24 @@ describe("OkzooV2", function () {
             await okzoo.connect(user).checkIn(deadline2, signature2);
             const streak = await okzoo.getStreak(user.address);
             expect(streak).to.equal(1);
+        });
+
+        it("Should return the correct streak if user missed 2 days", async function () {
+            const nonce = await okzoo.nonces(user.address);
+            const deadline = (await time.latest()) + 1000;
+
+            const signature = await getCheckInSignature(
+                user.address,
+                BigInt(deadline),
+                BigInt(nonce),
+                okzooAddress,
+                verifier,
+            );
+            await okzoo.connect(user).checkIn(deadline, signature);
+            await time.increase(86400 * 2); // Skip 2 days
+
+            const streak = await okzoo.getStreak(user.address);
+            expect(streak).to.equal(0);
         });
     });
 
@@ -263,7 +290,7 @@ describe("OkzooV2", function () {
 
             const signature2 = await getEvolveSignature(
                 user.address,
-                BigInt(1),
+                EvolutionStage.Infantile,
                 BigInt(deadline2),
                 nonce2,
                 okzooAddress,
@@ -271,7 +298,7 @@ describe("OkzooV2", function () {
             );
             await okzoo.connect(user).evolve(EvolutionStage.Infantile, deadline2, signature2);
             const userStage = await okzoo.getStage(user.address);
-            expect(userStage).to.equal("Infantile");
+            expect(userStage).to.equal(EvolutionStage.Infantile);
         });
         it("Should revert if user does not exist", async function () {
             const nonce = await okzoo.nonces(user.address);
@@ -279,7 +306,7 @@ describe("OkzooV2", function () {
 
             const signature = await getEvolveSignature(
                 user.address,
-                BigInt(1),
+                EvolutionStage.Infantile,
                 BigInt(deadline),
                 BigInt(nonce),
                 okzooAddress,
@@ -353,7 +380,7 @@ const getCheckInSignature = async (
 
 const getEvolveSignature = async (
     user: string,
-    stage: bigint,
+    stage: EvolutionStage,
     deadline: bigint,
     nonce: bigint,
     verifyingContract: string,

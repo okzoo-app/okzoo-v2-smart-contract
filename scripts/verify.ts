@@ -1,7 +1,7 @@
 import * as hre from "hardhat";
-import * as contracts from "../contracts.json";
+// import * as contracts from "../contracts.json";
 import * as contractOkzoo from "../contracts-okzoo.json";
-import { Config, ConfigToken } from "./config";
+// import { Config, ConfigToken } from "./config";
 
 async function main() {
     try {
