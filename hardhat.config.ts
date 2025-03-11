@@ -83,11 +83,16 @@ const config: HardhatUserConfig = {
             url: `https://tiniest-sly-haze.mantle-mainnet.quiknode.pro/61f33fea8db3e85b2bbc758e8fe9fbafac6f4e00/`,
             accounts: [`${process.env.PRIVATE_KEY}`],
         },
+        bsc: {
+            url: `https://thrumming-aged-friday.bsc.quiknode.pro/782e14349ccbf2b4c8c82024abcc5fda15e26f52/`,
+            accounts: [`${process.env.PRIVATE_KEY}`],
+        },
     },
     etherscan: {
         apiKey: {
             goerli: `${process.env.ETHERSCAN_KEY}`,
             sepolia: `${process.env.ETHERSCAN_KEY}`,
+            bsc: `${process.env.BSCSCAN_KEY}`,
             bscTestnet: `${process.env.BSCSCAN_KEY}`,
             polygonMumbai: `${process.env.POLYGONSCAN_KEY}`,
             mainnet: `${process.env.ETHERSCAN_KEY}`,
