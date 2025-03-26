@@ -112,7 +112,7 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, OwnableUpgradeable, EIP712Upgradea
             user.pendingBonus = true;
         }
 
-        emit CheckIn(msg.sender, user.streak, block.timestamp);
+        emit CheckedIn(msg.sender, user.streak, block.timestamp);
     }
 
     /**
@@ -133,7 +133,7 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, OwnableUpgradeable, EIP712Upgradea
 
         user.pendingBonus = false; // reset pending bonus
 
-        emit BonusClaimed(msg.sender, 1, block.timestamp);
+        emit BonusClaimed(msg.sender, user.lastCheckinDate, 1, block.timestamp);
     }
 
     /**

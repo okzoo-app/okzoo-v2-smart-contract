@@ -31,8 +31,8 @@ interface IOkzooV2 {
     }
 
     event VerifierChanged(address indexed newVerifier);
-    event CheckIn(address indexed user, uint256 streak, uint256 timestamp);
-    event BonusClaimed(address indexed user, uint256 amount, uint256 timestamp);
+    event CheckedIn(address indexed user, uint256 streak, uint256 timestamp);
+    event BonusClaimed(address indexed user, uint256 lastCheckin, uint256 amount, uint256 timestamp);
     event Evolved(address indexed user, EvolutionStage newStage, uint256 timestamp);
 
     function checkIn(uint256 _deadline, bytes memory _signature) external;
