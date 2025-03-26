@@ -12,8 +12,9 @@ import "hardhat-gas-reporter";
 import "hardhat-contract-sizer";
 import "hardhat-tracer";
 import "hardhat-log-remover";
-// import { parseEther } from "ethers";
+import "./hardhat.tasks.ts";
 
+// import { parseEther } from "ethers";
 dotenv.config();
 
 const config: HardhatUserConfig = {

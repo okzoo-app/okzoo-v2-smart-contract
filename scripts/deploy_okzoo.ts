@@ -3,7 +3,7 @@ import * as fs from "fs";
 import { formatEther, Signer } from "ethers";
 const ethers = hre.ethers;
 
-import { OkzooV2__factory } from "../typechain-types";
+// import { OkzooV2__factory } from "../typechain-types";
 import { ConfigOkzooV2 } from "./config";
 
 async function main() {
@@ -12,7 +12,7 @@ async function main() {
     const admin = await accounts[0].getAddress();
     //Loading contracts' factory
 
-    const OkzooV2: OkzooV2__factory = await ethers.getContractFactory("OkzooV2");
+    const OkzooV2 = await ethers.getContractFactory("OkzooV2");
 
     // Deploy contracts
     console.log("==================================================================");
