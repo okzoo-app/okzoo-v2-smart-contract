@@ -1,4 +1,4 @@
-import { Signer, ethers, formatEther } from "ethers";
+import { Signer, formatEther } from "ethers";
 import { task } from "hardhat/config";
 import * as fs from "fs";
 import path from "path";
@@ -14,7 +14,7 @@ task("balance", "Prints an account's balance")
 task("deployProxy", "Deploy a contract in using proxy pattern (openzepellin EIP712Upgradeable)")
     .addParam("contract", "The contract name to deploy")
     .addOptionalParam("configPath", "Path to contract config object")
-    .setAction(async (args: { contract: string; configPath: string }, hre, runSuper) => {
+    .setAction(async (args: { contract: string; configPath: string }, hre) => {
         const contractName = args.contract;
         const ethers = hre.ethers;
         console.log("==================================================================");
