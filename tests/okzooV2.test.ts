@@ -273,17 +273,17 @@ describe("OkzooV2", function () {
 
     describe("Evolution", function () {
         it("Should evolve user to the next stage with valid signature", async function () {
-            const nonce = await okzoo.nonces(user.address);
-            const deadline = (await time.latest()) + 1000;
+            // const nonce = await okzoo.nonces(user.address);
+            // const deadline = (await time.latest()) + 1000;
 
-            const signature = await getCheckInSignature(
-                user.address,
-                BigInt(deadline),
-                BigInt(nonce),
-                okzooAddress,
-                verifier,
-            );
-            await okzoo.connect(user).checkIn(deadline, signature);
+            // const signature = await getCheckInSignature(
+            //     user.address,
+            //     BigInt(deadline),
+            //     BigInt(nonce),
+            //     okzooAddress,
+            //     verifier,
+            // );
+            // await okzoo.connect(user).checkIn(deadline, signature);
 
             const nonce2 = await okzoo.nonces(user.address);
             const deadline2 = (await time.latest()) + 1000;
@@ -300,35 +300,35 @@ describe("OkzooV2", function () {
             const userStage = await okzoo.getStage(user.address);
             expect(userStage).to.equal(EvolutionStage.Infantile);
         });
-        it("Should revert if user does not exist", async function () {
-            const nonce = await okzoo.nonces(user.address);
-            const deadline = (await time.latest()) + 1000;
+        // it("Should revert if user does not exist", async function () {
+        //     const nonce = await okzoo.nonces(user.address);
+        //     const deadline = (await time.latest()) + 1000;
 
-            const signature = await getEvolveSignature(
-                user.address,
-                EvolutionStage.Infantile,
-                BigInt(deadline),
-                BigInt(nonce),
-                okzooAddress,
-                verifier,
-            );
+        //     const signature = await getEvolveSignature(
+        //         user.address,
+        //         EvolutionStage.Infantile,
+        //         BigInt(deadline),
+        //         BigInt(nonce),
+        //         okzooAddress,
+        //         verifier,
+        //     );
 
-            await expect(
-                okzoo.connect(user).evolve(EvolutionStage.Infantile, deadline, signature),
-            ).to.be.revertedWithCustomError(okzoo, "UserDoesNotExist");
-        });
+        //     await expect(
+        //         okzoo.connect(user).evolve(EvolutionStage.Infantile, deadline, signature),
+        //     ).to.be.revertedWithCustomError(okzoo, "UserDoesNotExist");
+        // });
         it("should not allow evolution without correct signature", async function () {
-            const nonce = await okzoo.nonces(user.address);
-            const deadline = (await time.latest()) + 1000;
+            // const nonce = await okzoo.nonces(user.address);
+            // const deadline = (await time.latest()) + 1000;
 
-            const signature = await getCheckInSignature(
-                user.address,
-                BigInt(deadline),
-                BigInt(nonce),
-                okzooAddress,
-                verifier,
-            );
-            await okzoo.connect(user).checkIn(deadline, signature);
+            // const signature = await getCheckInSignature(
+            //     user.address,
+            //     BigInt(deadline),
+            //     BigInt(nonce),
+            //     okzooAddress,
+            //     verifier,
+            // );
+            // await okzoo.connect(user).checkIn(deadline, signature);
 
             const deadline2 = (await time.latest()) + 1000;
 
@@ -339,6 +339,132 @@ describe("OkzooV2", function () {
                 okzoo,
                 "InvalidSignature",
             );
+        });
+        it("Should revert if user tries to evolve to the same stage", async function () {
+            // const nonce = await okzoo.nonces(user.address);
+            // const deadline = (await time.latest()) + 1000;
+
+            // const signature = await getCheckInSignature(
+            //     user.address,
+            //     BigInt(deadline),
+            //     BigInt(nonce),
+            //     okzooAddress,
+            //     verifier,
+            // );
+            // await okzoo.connect(user).checkIn(deadline, signature);
+
+            const nonce2 = await okzoo.nonces(user.address);
+            const deadline2 = (await time.latest()) + 1000;
+
+            const signature2 = await getEvolveSignature(
+                user.address,
+                EvolutionStage.Infantile,
+                BigInt(deadline2),
+                nonce2,
+                okzooAddress,
+                verifier,
+            );
+            await okzoo.connect(user).evolve(EvolutionStage.Infantile, deadline2, signature2);
+
+            const nonce3 = await okzoo.nonces(user.address);
+            const deadline3 = (await time.latest()) + 1000;
+
+            const signature3 = await getEvolveSignature(
+                user.address,
+                EvolutionStage.Infantile,
+                BigInt(deadline3),
+                nonce3,
+                okzooAddress,
+                verifier,
+            );
+
+            await expect(
+                okzoo.connect(user).evolve(EvolutionStage.Infantile, deadline3, signature3),
+            ).to.be.revertedWithCustomError(okzoo, "AlreadyEvolved");
+        });
+        it("Should revert if user tries to evolve to a lower stage", async function () {
+            // const nonce = await okzoo.nonces(user.address);
+            // const deadline = (await time.latest()) + 1000;
+
+            // const signature = await getCheckInSignature(
+            //     user.address,
+            //     BigInt(deadline),
+            //     BigInt(nonce),
+            //     okzooAddress,
+            //     verifier,
+            // );
+            // await okzoo.connect(user).checkIn(deadline, signature);
+
+            const nonce2 = await okzoo.nonces(user.address);
+            const deadline2 = (await time.latest()) + 1000;
+
+            const signature2 = await getEvolveSignature(
+                user.address,
+                EvolutionStage.Infantile,
+                BigInt(deadline2),
+                nonce2,
+                okzooAddress,
+                verifier,
+            );
+            await okzoo.connect(user).evolve(EvolutionStage.Infantile, deadline2, signature2);
+
+            const nonce3 = await okzoo.nonces(user.address);
+            const deadline3 = (await time.latest()) + 1000;
+
+            const signature3 = await getEvolveSignature(
+                user.address,
+                EvolutionStage.Protoform,
+                BigInt(deadline3),
+                nonce3,
+                okzooAddress,
+                verifier,
+            );
+
+            await expect(
+                okzoo.connect(user).evolve(EvolutionStage.Protoform, deadline3, signature3),
+            ).to.be.revertedWithCustomError(okzoo, "AlreadyEvolved");
+        });
+        it("Should revert if user tries to evolve to higher stage", async function () {
+            // const nonce = await okzoo.nonces(user.address);
+            // const deadline = (await time.latest()) + 1000;
+
+            // const signature = await getCheckInSignature(
+            //     user.address,
+            //     BigInt(deadline),
+            //     BigInt(nonce),
+            //     okzooAddress,
+            //     verifier,
+            // );
+            // await okzoo.connect(user).checkIn(deadline, signature);
+
+            const nonce2 = await okzoo.nonces(user.address);
+            const deadline2 = (await time.latest()) + 1000;
+
+            const signature2 = await getEvolveSignature(
+                user.address,
+                EvolutionStage.Infantile,
+                BigInt(deadline2),
+                nonce2,
+                okzooAddress,
+                verifier,
+            );
+            await okzoo.connect(user).evolve(EvolutionStage.Infantile, deadline2, signature2);
+
+            const nonce3 = await okzoo.nonces(user.address);
+            const deadline3 = (await time.latest()) + 1000;
+
+            const signature3 = await getEvolveSignature(
+                user.address,
+                EvolutionStage.Adolescent,
+                BigInt(deadline3),
+                nonce3,
+                okzooAddress,
+                verifier,
+            );
+
+            await expect(
+                okzoo.connect(user).evolve(EvolutionStage.Adolescent, deadline3, signature3),
+            ).to.be.revertedWithCustomError(okzoo, "AlreadyEvolved");
         });
     });
 });

@@ -112,7 +112,7 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, OwnableUpgradeable, EIP712Upgradea
             user.pendingBonus = true;
         }
 
-        emit CheckIn(msg.sender, user.streak, block.timestamp);
+        emit CheckedIn(msg.sender, user.streak, block.timestamp);
     }
 
     /**
@@ -133,7 +133,7 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, OwnableUpgradeable, EIP712Upgradea
 
         user.pendingBonus = false; // reset pending bonus
 
-        emit BonusClaimed(msg.sender, 1, block.timestamp);
+        emit BonusClaimed(msg.sender, user.lastCheckinDate, 1, block.timestamp);
     }
 
     /**
@@ -142,7 +142,7 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, OwnableUpgradeable, EIP712Upgradea
      * @param _deadline The deadline for the evolution.
      * @param _signature The signature for verification.
      */
-    function evolve(EvolutionStage _stage, uint256 _deadline, bytes memory _signature) public onlyUser {
+    function evolve(EvolutionStage _stage, uint256 _deadline, bytes memory _signature) public {
         if (!verifyEvolve(msg.sender, _stage, _deadline, _useNonce(msg.sender), _signature)) revert InvalidSignature();
 
         if (_deadline < block.timestamp) revert DeadlinePassed();
@@ -153,8 +153,14 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, OwnableUpgradeable, EIP712Upgradea
             revert AlreadyAtHighestStage();
         }
 
+        EvolutionStage nextStage = EvolutionStage(uint256(user.stage) + 1);
+
+        if (user.stage == _stage || nextStage != _stage) {
+            revert AlreadyEvolved();
+        }
+
         // just evolve to the next stage
-        user.stage = EvolutionStage(uint256(user.stage) + 1);
+        user.stage = nextStage;
 
         emit Evolved(msg.sender, user.stage, block.timestamp);
     }

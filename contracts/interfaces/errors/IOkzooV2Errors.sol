@@ -7,6 +7,7 @@ interface IOkzooV2Errors {
     error UserDoesNotExist();
     error MustClaimBonusBeforeCheckin();
     error AlreadyAtHighestStage();
+    error AlreadyEvolved();
     error InvalidSignature();
     error DeadlinePassed();
     error ZeroAddress();
