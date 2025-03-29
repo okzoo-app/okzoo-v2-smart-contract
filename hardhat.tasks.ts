@@ -12,7 +12,7 @@ extendEnvironment((hre: HardhatRuntimeEnvironment) => {
     const apiKeyObj = hre.config.etherscan.apiKey;
     // @ts-expect-error - Network name is dynamically assigned
     if (!apiKeyObj[hre.network.name]) {
-        const apiKey = getConfiguredVar("API_KEY");
+        const apiKey = getConfiguredVar("ETHERSCAN_KEY");
         // @ts-expect-error - Network name is dynamically assigned
         apiKeyObj[hre.network.name] = apiKey;
     }
@@ -24,6 +24,8 @@ task("deployProxy", "Deploy a contract in using proxy pattern (openzepellin EIP7
     .setAction(async (args: ContractInfo, hre) => {
         console.log("DEPLOY CONTRACTS: ", args.contract);
         const taskName = "deployProxy";
+        // compile before deploy/upgrade
+        hre.run("compile");
 
         const operation = new ContractOperation(hre);
         const deployedContract = await operation.deployProxy(args);
@@ -65,6 +67,8 @@ task("upgradeProxy", "upgrades a contract")
     .addFlag("force", "Force upgrare even if contract was not registered")
     .setAction(async (args: ContractInfo, hre) => {
         const taskName = "upgradeProxy";
+        // compile before deploy/upgrade
+        hre.run("compile");
 
         const operation = new ContractOperation(hre);
         const deployedContract = await operation.upgradeProxy(args);
@@ -80,6 +84,8 @@ task("deploy", "Deploy a normal contract")
     .addOptionalParam("configPath", "Path to contract config object")
     .setAction(async (args: ContractInfo, hre) => {
         const taskName = "deploy";
+        // compile before deploy/upgrade
+        hre.run("compile");
 
         const operation = new ContractOperation(hre);
         const deployedContract = await operation.deploy(args);
