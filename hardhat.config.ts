@@ -88,7 +88,7 @@ const config: HardhatUserConfig = {
         bsc: {
             // url: `https://thrumming-aged-friday.bsc.quiknode.pro/782e14349ccbf2b4c8c82024abcc5fda15e26f52/`,
             // url: `https://binance.llamarpc.com`,
-            url: `https://rpc.ankr.com/bsc`,
+            url: `https://rpc.ankr.com/bsc/${process.env.RPC_ANKR_KEY}`,
             //accounts: [`${process.env.PRIVATE_KEY}`],
         },
     },
