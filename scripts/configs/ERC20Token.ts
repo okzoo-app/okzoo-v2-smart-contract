@@ -3,7 +3,7 @@ const config = {
     name: "StakeToken",
     symbol: "STK",
     mintAmount: "100000000",
-    recipient: "0x781A5e70d71A1a223995FbCcfF810d57b9Ef1098",
+    recipient: "0xe492BE5D1f9C0DA726C560Bc451835AfC5568313",
 };
 
 export default config;

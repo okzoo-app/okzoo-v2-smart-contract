@@ -53,7 +53,7 @@ export class ContractOperation {
             // Run verification through Hardhat's verify plugin
             const contract = await this.hre.run("verify:verify", {
                 address: args.address,
-                // force: true,}
+                // force: true,
             });
             console.log(contract);
         } catch (e) {

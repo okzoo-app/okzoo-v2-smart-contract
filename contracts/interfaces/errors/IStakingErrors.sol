@@ -11,4 +11,7 @@ interface IStakingErrors {
     error AlreadyClaimed();
     error NotClaimTime();
     error NotEmergencyWithdraw();
+
+    error InvalidTier();
+    error InvalidBaseAPR();
 }
