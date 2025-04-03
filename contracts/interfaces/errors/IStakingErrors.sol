@@ -5,8 +5,6 @@ interface IStakingErrors {
     error ZeroAddress();
     error InvalidAmount();
     error InsufficientStakedAmount();
-    error MaximumUnstakeRequestReached();
-    error DuplicateUnstakeRequest();
     error NotRequestOwner();
     error AlreadyClaimed();
     error NotClaimTime();

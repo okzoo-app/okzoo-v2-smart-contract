@@ -14,11 +14,16 @@ interface IStaking {
     }
 
     event Staked(address indexed user, bytes32 indexed stakeRequestId, uint256 amount, uint256 lockPeriod);
-
     event Claimed(address indexed user, bytes32 indexed unstakeRequestId, uint256 amount, uint256 reward);
+
     event EmergencyWithdrawn(address indexed user, uint256 amount);
-    event UnstakeLockTimeChanged(uint256 oldUnstakeLockTime, uint256 newUnstakeLockTime);
     event SetIsEmergencyWithdraw(bool emergencyWithdraw);
+
+    struct StakeEvent {
+        uint256 time;
+        uint256 amount;
+        bool isStart;
+    }
 
     struct StakeRequest {
         address owner;
@@ -39,24 +44,25 @@ interface IStaking {
         LockPeriod[] calldata _lockPeriods
     ) external;
 
-    function getTier(uint256 amount) external view returns (uint256);
+    function setIsEmergencyWithdraw(bool _value) external;
+
     function getAPR(uint256 amount) external view returns (uint256);
+
     function getPeriodBonus(uint256 daysLocked) external view returns (uint256);
 
     function pause() external;
+
     function unpause() external;
 
     function stake(uint256 amount, uint256 lockPeriod) external;
+
     function claim(bytes32 stakeRequestId) external;
 
-    // // Getters
-    // function stakeToken() external view returns (IERC20Upgradeable);
+    function emergencyWithdraw() external;
 
-    // function unstakeLockTime() external view returns (uint256);
+    function getUserStakeRequests(address _user) external view returns (bytes32[] memory);
 
-    // function totalStaked() external view returns (uint256);
+    function getUserStakeEvents(address _user) external view returns (StakeEvent[] memory);
 
-    // function stakedAmount(address user) external view returns (uint256);
-
-    // function getUserUnstakeRequests(address _user) external view returns (bytes32[] memory);
+    function getReward(bytes32 stakeRequestId) external view returns (uint256);
 }
