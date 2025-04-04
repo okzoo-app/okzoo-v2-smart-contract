@@ -6,8 +6,11 @@ import { ContractInfo, ContractOperation } from "./scripts/contract-operation";
 
 // additional settings
 extendEnvironment((hre: HardhatRuntimeEnvironment) => {
-    const account = getConfiguredVar("PRIVATE_KEY"); // owner account
-    hre.config.networks[hre.network.name].accounts = [account];
+    // For local development, we dont need to specify the private key
+    if (hre.network.name !== "hardhat") {
+        const account = getConfiguredVar("PRIVATE_KEY"); // owner account
+        hre.config.networks[hre.network.name].accounts = [account];
+    }
 
     const apiKeyObj = hre.config.etherscan.apiKey;
     // @ts-expect-error - Network name is dynamically assigned
