@@ -51,7 +51,7 @@ interface IStaking {
 
     function getAPR(uint256 amount) external view returns (uint256);
 
-    function getPeriodBonus(uint256 daysLocked) external view returns (uint256);
+    function getBonusPeriod(uint256 daysLocked) external view returns (uint256);
 
     function pause() external;
 

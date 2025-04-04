@@ -301,7 +301,7 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
     /**
      * @dev Returns the bonus APR for a given lock period.
      */
-    function getPeriodBonus(uint256 daysLocked) external view returns (uint256) {
+    function getBonusPeriod(uint256 daysLocked) external view returns (uint256) {
         return lockPeriods[daysLocked];
     }
 

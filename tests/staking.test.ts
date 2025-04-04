@@ -23,6 +23,9 @@ describe("Staking Contract", function () {
     const minStakeAmount = parseUnits("100", 18);
     const maxCap = parseUnits("100000", 18);
 
+    const initialStakeAmount = parseUnits("100", 18);
+    const lockPeriod = 30; // 30 days
+
     beforeEach(async function () {
         [owner, user1, user2] = await ethers.getSigners();
         // Deploy ERC20 token for staking and rewards
@@ -33,7 +36,7 @@ describe("Staking Contract", function () {
         stakeAddress = await stakeToken.getAddress();
         rewardAddress = await rewardToken.getAddress();
 
-        const startTime = (await time.latest()) + 10;
+        const startTime = (await time.latest()) - 10;
 
         const endTime = startTime + 86400; // 1 day in seconds
         const tiers = [
@@ -123,19 +126,12 @@ describe("Staking Contract", function () {
 
     describe("Staking", function () {
         beforeEach(async function () {
-            // await time.increaseTo((await time.latest()) + 10);
-            // Transfer some tokens to the users
-            await stakeToken.connect(owner).transfer(user1.address, parseUnits("1000", 18));
-            await stakeToken.connect(owner).transfer(user2.address, parseUnits("1000", 18));
-            await rewardToken.connect(owner).transfer(stakingAddress, parseUnits("100000", 18));
-
             // Approve the staking contract to spend the user's tokens
             await stakeToken.connect(user1).approve(stakingAddress, parseUnits("100000", 18));
             await stakeToken.connect(user2).approve(stakingAddress, parseUnits("100000", 18));
         });
 
         it("should allow a user to stake tokens", async function () {
-            const initialStakeAmount = parseUnits("100", 18);
             await staking.connect(user1).stake(initialStakeAmount, 30);
 
             const stakedAmount = await staking.stakedAmount(user1.address);
@@ -184,8 +180,6 @@ describe("Staking Contract", function () {
 
         it("should transfer tokens from the user to the contract", async function () {
             // Check initial balances
-            const initialStakeAmount = parseUnits("100", 18);
-            const lockPeriod = 30; // 30 days
             const userBalanceBefore = await stakeToken.balanceOf(user1.address);
             const contractBalanceBefore = await stakeToken.balanceOf(stakingAddress);
 
@@ -200,9 +194,6 @@ describe("Staking Contract", function () {
         });
 
         it("should generate a unique stake request ID and store the stake request", async function () {
-            const initialStakeAmount = parseUnits("100", 18);
-            const lockPeriod = 30; // 30 days
-
             // Trigger the stake
             await staking.connect(user1).stake(initialStakeAmount, lockPeriod);
 
@@ -224,9 +215,6 @@ describe("Staking Contract", function () {
         });
 
         it("should update the user's staking history", async function () {
-            const initialStakeAmount = parseUnits("100", 18);
-            const lockPeriod = 30; // 30 days
-
             // Trigger the stake
             await staking.connect(user1).stake(initialStakeAmount, lockPeriod);
 
@@ -241,9 +229,6 @@ describe("Staking Contract", function () {
         });
 
         it("should update the user's staked amount and the total staked amount", async function () {
-            const initialStakeAmount = parseUnits("100", 18);
-            const lockPeriod = 30; // 30 days
-
             await stakeToken.connect(user1).approve(stakingAddress, initialStakeAmount);
 
             // Get initial staked amounts
@@ -263,33 +248,90 @@ describe("Staking Contract", function () {
         });
     });
 
-    // describe("Claiming", function () {
-    //     it("should allow a user to claim rewards after the lock period ends", async function () {
-    //         await stakeToken.connect(user1).approve(staking.address, initialStakeAmount);
-    //         await staking.connect(user1).stake(initialStakeAmount, 30); // Assume lock period is 30 days
+    describe("Claiming", function () {
+        beforeEach(async function () {
+            // Approve the staking contract to spend the user's tokens
+            await stakeToken.connect(user1).approve(stakingAddress, parseUnits("100000", 18));
+            await stakeToken.connect(user2).approve(stakingAddress, parseUnits("100000", 18));
+        });
 
-    //         // Fast forward time to after the lock period
-    //         await ethers.provider.send("evm_increaseTime", [31 * 24 * 60 * 60]);
-    //         await ethers.provider.send("evm_mine");
+        it("should allow a user to claim rewards after the lock period ends", async function () {
+            const balanceBefore = await stakeToken.balanceOf(user1.address);
+            const contractBalanceBefore = await stakeToken.balanceOf(stakingAddress);
+            const rewardBalanceBefore = await rewardToken.balanceOf(user1.address);
+            const rewardContractBalanceBefore = await rewardToken.balanceOf(stakingAddress);
 
-    //         const balanceBefore = await rewardToken.balanceOf(user1.address);
-    //         await staking.connect(user1).claim(1); // Assuming '1' is a valid stakeRequestId
+            await staking.connect(user1).stake(initialStakeAmount, lockPeriod); // Assume lock period is 30 days
+            const stakeRequestIds = await staking.getUserStakeRequests(user1.address);
 
-    //         const balanceAfter = await rewardToken.balanceOf(user1.address);
-    //         expect(balanceAfter).to.be.gt(balanceBefore);
-    //     });
+            // Retrieve the stake request from the contract
+            const stakeRequest = await staking.stakeRequests(stakeRequestIds[0]);
 
-    //     it("should revert if trying to claim before 1/4 of the lock period has passed", async function () {
-    //         await stakeToken.connect(user1).approve(staking.address, initialStakeAmount);
-    //         await staking.connect(user1).stake(initialStakeAmount, 30);
+            await time.increase(Number(stakeRequest.unLockTime) - (await time.latest()) - 1); // Fast forward time to after the lock period
 
-    //         // Fast forward time to before 1/4 of the lock period has passed
-    //         await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60]); // 7 days
-    //         await ethers.provider.send("evm_mine");
+            await staking.connect(user1).claim(stakeRequestIds[0]);
 
-    //         await expect(staking.connect(user1).claim(1)).to.be.revertedWith("NotClaimTime");
-    //     });
-    // });
+            const apr = await staking.getAPR(stakeRequest.amount);
+            const bonusPeriod = await staking.getBonusPeriod(stakeRequest.lockPeriod);
+
+            // TODO: Double check the reward calculation
+            const reward =
+                (stakeRequest.amount * (apr + bonusPeriod) * (stakeRequest.unLockTime - stakeRequest.stakeTime)) /
+                100n /
+                365n /
+                BigInt(ONE_DAY);
+
+            const balanceAfter = await stakeToken.balanceOf(user1.address);
+            const contractBalanceAfter = await stakeToken.balanceOf(stakingAddress);
+            const rewardBalanceAfter = await rewardToken.balanceOf(user1.address);
+            const rewardContractBalanceAfter = await rewardToken.balanceOf(stakingAddress);
+
+            expect(balanceAfter).to.be.equal(balanceBefore);
+            expect(contractBalanceAfter).to.be.equal(contractBalanceBefore);
+            expect(rewardBalanceAfter).to.be.equal(rewardBalanceBefore + reward);
+            expect(rewardContractBalanceAfter).to.be.equal(rewardContractBalanceBefore - reward);
+        });
+
+        it("should revert if trying to claim before 1/4 of the lock period has passed", async function () {
+            await staking.connect(user1).stake(initialStakeAmount, lockPeriod); // Assume lock period is 30 days
+            const stakeRequestIds = await staking.getUserStakeRequests(user1.address);
+
+            // Retrieve the stake request from the contract
+            const stakeRequest = await staking.stakeRequests(stakeRequestIds[0]);
+
+            await time.increase((Number(stakeRequest.unLockTime) - Number(stakeRequest.stakeTime)) / 4 - 2); // Fast forward time to after the lock period
+
+            const claim = staking.connect(user1).claim(stakeRequestIds[0]);
+            await expect(claim).to.be.revertedWithCustomError(staking, "NotClaimTime");
+        });
+
+        it("should allow a user to claim after 1/4 of the lock period has passed, but no has reward", async function () {
+            const balanceBefore = await stakeToken.balanceOf(user1.address);
+            const contractBalanceBefore = await stakeToken.balanceOf(stakingAddress);
+            const rewardBalanceBefore = await rewardToken.balanceOf(user1.address);
+            const rewardContractBalanceBefore = await rewardToken.balanceOf(stakingAddress);
+
+            await staking.connect(user1).stake(initialStakeAmount, lockPeriod); // Assume lock period is 30 days
+            const stakeRequestIds = await staking.getUserStakeRequests(user1.address);
+
+            // Retrieve the stake request from the contract
+            const stakeRequest = await staking.stakeRequests(stakeRequestIds[0]);
+
+            await time.increase((Number(stakeRequest.unLockTime) - Number(stakeRequest.stakeTime)) / 4 + 1); // Fast forward time to after the lock period
+
+            await staking.connect(user1).claim(stakeRequestIds[0]);
+
+            const balanceAfter = await stakeToken.balanceOf(user1.address);
+            const contractBalanceAfter = await stakeToken.balanceOf(stakingAddress);
+            const rewardBalanceAfter = await rewardToken.balanceOf(user1.address);
+            const rewardContractBalanceAfter = await rewardToken.balanceOf(stakingAddress);
+
+            expect(balanceAfter).to.be.equal(balanceBefore);
+            expect(contractBalanceAfter).to.be.equal(contractBalanceBefore);
+            expect(rewardBalanceAfter).to.be.equal(rewardBalanceBefore);
+            expect(rewardContractBalanceAfter).to.be.equal(rewardContractBalanceBefore);
+        });
+    });
 
     // describe("Emergency Withdrawals", function () {
     //     it("should allow emergency withdrawal when enabled", async function () {
