@@ -17,6 +17,7 @@ describe("Staking Contract", function () {
     let owner: SignerWithAddress;
     let user1: SignerWithAddress;
     let user2: SignerWithAddress;
+    const ONE_DAY = 60; // seconds in a day
     const mintAmount = parseUnits("1000000", 18);
 
     const minStakeAmount = parseUnits("100", 18);
@@ -32,8 +33,9 @@ describe("Staking Contract", function () {
         stakeAddress = await stakeToken.getAddress();
         rewardAddress = await rewardToken.getAddress();
 
-        const startTime = 0;
-        const endTime = 10000000000000;
+        const startTime = (await time.latest()) + 10;
+
+        const endTime = startTime + 86400; // 1 day in seconds
         const tiers = [
             {
                 minStake: parseUnits("10", 18).toString(),
@@ -121,6 +123,7 @@ describe("Staking Contract", function () {
 
     describe("Staking", function () {
         beforeEach(async function () {
+            // await time.increaseTo((await time.latest()) + 10);
             // Transfer some tokens to the users
             await stakeToken.connect(owner).transfer(user1.address, parseUnits("1000", 18));
             await stakeToken.connect(owner).transfer(user2.address, parseUnits("1000", 18));
@@ -151,6 +154,112 @@ describe("Staking Contract", function () {
 
             const stake = staking.connect(user2).stake(parseUnits("20000", 18), 30);
             await expect(stake).to.be.revertedWithCustomError(staking, "InvalidAmount");
+        });
+
+        it("should revert if the staking period is not valid", async function () {
+            const invalidPeriod = 10;
+
+            const stake = staking.connect(user1).stake(parseUnits("100", 18), invalidPeriod);
+            await expect(stake).to.be.revertedWithCustomError(staking, "InvalidLockPeriod");
+        });
+
+        it("should revert if the staking is paused", async function () {
+            await staking.connect(owner).pause();
+
+            const stake = staking.connect(user1).stake(parseUnits("100", 18), 30);
+            await expect(stake).to.be.rejectedWith("Pausable: paused");
+        });
+
+        // it("should revert if the staking is not started yet", async function () {
+        //     const stake = staking.connect(user1).stake(parseUnits("100", 18), 30);
+        //     await expect(stake).to.be.revertedWithCustomError(staking, "StakingNotStarted");
+        // });
+
+        it("should revert if the staking is ended", async function () {
+            await time.increase(86400 * 2); // Fast forward time to after the end time
+
+            const stake = staking.connect(user1).stake(parseUnits("100", 18), 30);
+            await expect(stake).to.be.revertedWithCustomError(staking, "NotStakeTime");
+        });
+
+        it("should transfer tokens from the user to the contract", async function () {
+            // Check initial balances
+            const initialStakeAmount = parseUnits("100", 18);
+            const lockPeriod = 30; // 30 days
+            const userBalanceBefore = await stakeToken.balanceOf(user1.address);
+            const contractBalanceBefore = await stakeToken.balanceOf(stakingAddress);
+
+            await staking.connect(user1).stake(initialStakeAmount, lockPeriod);
+
+            // Check balances after staking
+            const userBalanceAfter = await stakeToken.balanceOf(user1.address);
+            const contractBalanceAfter = await stakeToken.balanceOf(stakingAddress);
+
+            expect(userBalanceBefore - userBalanceAfter).to.equal(initialStakeAmount);
+            expect(contractBalanceAfter - contractBalanceBefore).to.equal(initialStakeAmount);
+        });
+
+        it("should generate a unique stake request ID and store the stake request", async function () {
+            const initialStakeAmount = parseUnits("100", 18);
+            const lockPeriod = 30; // 30 days
+
+            // Trigger the stake
+            await staking.connect(user1).stake(initialStakeAmount, lockPeriod);
+
+            const now = (await ethers.provider.getBlock("latest").then((block) => block?.timestamp)) || 0;
+
+            const stakeRequestIds = await staking.getUserStakeRequests(user1.address);
+
+            // Retrieve the stake request from the contract
+            const stakeRequest = await staking.stakeRequests(stakeRequestIds[0]);
+
+            const unLockTime = now + lockPeriod * ONE_DAY;
+
+            // Verify the stake request details
+            expect(stakeRequest.owner).to.equal(user1.address);
+            expect(stakeRequest.amount).to.equal(initialStakeAmount);
+            expect(stakeRequest.lockPeriod).to.equal(lockPeriod);
+            expect(stakeRequest.unLockTime).to.equal(now + lockPeriod * ONE_DAY);
+            expect(stakeRequest.claimed).to.equal(false);
+        });
+
+        it("should update the user's staking history", async function () {
+            const initialStakeAmount = parseUnits("100", 18);
+            const lockPeriod = 30; // 30 days
+
+            // Trigger the stake
+            await staking.connect(user1).stake(initialStakeAmount, lockPeriod);
+
+            // Get the user's stake events
+            const userStakeEvents = await staking.getUserStakeEvents(user1.address);
+
+            // The first event should be the staking event, the second should be the unlock event
+            expect(userStakeEvents[0].amount).to.equal(initialStakeAmount);
+            expect(userStakeEvents[0].isStart).to.equal(true);
+            expect(userStakeEvents[1].amount).to.equal(initialStakeAmount);
+            expect(userStakeEvents[1].isStart).to.equal(false);
+        });
+
+        it("should update the user's staked amount and the total staked amount", async function () {
+            const initialStakeAmount = parseUnits("100", 18);
+            const lockPeriod = 30; // 30 days
+
+            await stakeToken.connect(user1).approve(stakingAddress, initialStakeAmount);
+
+            // Get initial staked amounts
+            const userStakedAmountBefore = await staking.stakedAmount(user1.address);
+            const totalStakedBefore = await staking.totalStaked();
+
+            // Trigger the stake
+            await staking.connect(user1).stake(initialStakeAmount, lockPeriod);
+
+            // Get staked amounts after the stake
+            const userStakedAmountAfter = await staking.stakedAmount(user1.address);
+            const totalStakedAfter = await staking.totalStaked();
+
+            // Verify that the user's staked amount and total staked amount have been updated
+            expect(userStakedAmountAfter - userStakedAmountBefore).to.equal(initialStakeAmount);
+            expect(totalStakedAfter - totalStakedBefore).to.equal(initialStakeAmount);
         });
     });
 
