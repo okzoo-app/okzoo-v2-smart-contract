@@ -1,22 +1,25 @@
 import * as fs from "fs";
-import { task } from "hardhat/config";
-// import { HardhatRuntimeEnvironment } from "hardhat/types";
+import { extendEnvironment, task, vars } from "hardhat/config";
+import { HardhatRuntimeEnvironment } from "hardhat/types";
 import path from "path";
 import { ContractInfo, ContractOperation } from "./scripts/contract-operation";
 
-// // additional settings
-// extendEnvironment((hre: HardhatRuntimeEnvironment) => {
-//     const account = getConfiguredVar("PRIVATE_KEY"); // owner account
-//     hre.config.networks[hre.network.name].accounts = [account];
+// additional settings
+extendEnvironment((hre: HardhatRuntimeEnvironment) => {
+    // For local development, we dont need to specify the private key
+    if (hre.network.name !== "hardhat") {
+        const account = getConfiguredVar("PRIVATE_KEY"); // owner account
+        hre.config.networks[hre.network.name].accounts = [account];
+    }
+    const apiKeyObj = hre.config.etherscan.apiKey;
 
-//     const apiKeyObj = hre.config.etherscan.apiKey;
-//     // @ts-expect-error - Network name is dynamically assigned
-//     if (!apiKeyObj[hre.network.name]) {
-//         const apiKey = getConfiguredVar("ETHERSCAN_KEY");
-//         // @ts-expect-error - Network name is dynamically assigned
-//         apiKeyObj[hre.network.name] = apiKey;
-//     }
-// });
+    // @ts-expect-error - Network name is dynamically assigned
+    if (!apiKeyObj[hre.network.name]) {
+        const apiKey = getConfiguredVar("ETHERSCAN_KEY");
+        // @ts-expect-error - Network name is dynamically assigned
+        apiKeyObj[hre.network.name] = apiKey;
+    }
+});
 // Task: Deploy a new upgradeable contract using OpenZeppelin's proxy pattern
 task("deployProxy", "Deploy a contract in using proxy pattern (openzepellin EIP712Upgradeable)")
     .addParam("contract", "The contract name to deploy")
@@ -96,14 +99,14 @@ task("deploy", "Deploy a normal contract")
     });
 
 // Helper: get value for a var, either from env or vars setting
-// function getConfiguredVar(key: string) {
-//     let account = process.env[key] || "";
-//     if (!account) {
-//         // try to get from var config if not found in env
-//         account = vars.get(key, "");
-//     }
-//     return account;
-// }
+function getConfiguredVar(key: string) {
+    let account = process.env[key] || "";
+    if (!account) {
+        // try to get from var config if not found in env
+        account = vars.get(key, "");
+    }
+    return account;
+}
 
 // Helper: Log contract deployment/verification/upgrade details to contracts.json
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
