@@ -14,7 +14,8 @@ interface IStaking {
     }
 
     event Staked(address indexed user, bytes32 indexed stakeRequestId, uint256 amount, uint256 lockPeriod);
-    event Claimed(address indexed user, bytes32 indexed unstakeRequestId, uint256 amount, uint256 reward);
+    event Claimed(address indexed user, bytes32 indexed stakeRequestId, uint256 amount, uint256 reward);
+    event Withdrawn(address indexed token, address indexed to, uint256 amount);
 
     event EmergencyWithdrawn(address indexed user, uint256 amount);
     event SetIsEmergencyWithdraw(bool emergencyWithdraw);
@@ -38,6 +39,8 @@ interface IStaking {
         address _owner,
         address _stakeToken,
         address _rewardToken,
+        uint256 _startTime,
+        uint256 _endTime,
         uint256 _maxCap,
         uint256 _minStakeAmount,
         Tier[] calldata _tiers,
@@ -57,6 +60,8 @@ interface IStaking {
     function stake(uint256 amount, uint256 lockPeriod) external;
 
     function claim(bytes32 stakeRequestId) external;
+
+    function withdraw(address token, address to, uint256 amount) external;
 
     function emergencyWithdraw() external;
 

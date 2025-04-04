@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import {IStakingErrors} from "./interfaces/errors/IStakingErrors.sol";
-import {IStaking} from "./interfaces/IStaking.sol";
+import {AddressUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {SafeERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import {EnumerableSetUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
+import {IStakingErrors} from "./interfaces/errors/IStakingErrors.sol";
+import {IStaking} from "./interfaces/IStaking.sol";
 
 /**
  * @title Staking Contract
@@ -16,11 +17,15 @@ import {EnumerableSetUpgradeable} from "@openzeppelin/contracts-upgradeable/util
  */
 contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
+    using AddressUpgradeable for address payable;
+
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.Bytes32Set;
 
     uint256 private constant ONE_DAY = 60; //TODO: change to 1 days
 
     // uint256 public constant MAXIMUM_STAKE_REQUESTS = 15;
+    uint256 public startTime;
+    uint256 public endTime;
     uint256 public maxCap; // Maximum staking cap
     uint256 public minStakeAmount; // Minimum amount allowed to stake
 
@@ -38,6 +43,8 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
     // Use for emergency withdraw
     bool public isEmergencyWithdraw;
 
+    mapping(address => uint256) public nonces;
+
     /**
      * @dev Initializes the staking contract.
      */
@@ -45,6 +52,8 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         address _owner,
         address _stakeToken,
         address _rewardToken,
+        uint256 _startTime,
+        uint256 _endTime,
         uint256 _maxCap,
         uint256 _minStakeAmount,
         Tier[] calldata _tiers,
@@ -59,6 +68,8 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         }
         stakeToken = IERC20Upgradeable(_stakeToken);
         rewardToken = IERC20Upgradeable(_rewardToken);
+        startTime = _startTime;
+        endTime = _endTime;
         maxCap = _maxCap;
         minStakeAmount = _minStakeAmount;
 
@@ -132,16 +143,23 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
      * - Emits a `Staked` event with details of the stake.
      */
     function stake(uint256 amount, uint256 lockPeriod) external nonReentrant whenNotPaused {
+        // Check if the current time is past the allowed staking period
+        if (block.timestamp < startTime || endTime < block.timestamp) {
+            revert NotStakeTime();
+        }
+
         // Ensure the staking amount is within the allowed limits
         if (amount < minStakeAmount || totalStaked + amount > maxCap) {
             revert InvalidAmount();
         }
 
+        if (lockPeriods[lockPeriod] == 0 && lockPeriod != 0) revert InvalidLockPeriod();
+
         // Transfer the staking tokens from the user to the contract
         stakeToken.safeTransferFrom(msg.sender, address(this), amount);
 
         // Generate a unique ID for the stake request
-        bytes32 stakeRequestId = _hashStakeRequest(msg.sender, amount);
+        bytes32 stakeRequestId = _hashStakeRequest(msg.sender, amount, _useNonce(msg.sender));
 
         // Create the stake request object
         StakeRequest memory stakeRequest = StakeRequest({
@@ -204,28 +222,36 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         }
 
         // Ensure the claim is being made after at least 1/4 of the lock period has passed
-        if (block.timestamp < stakeRequest.unLockTime - (stakeRequest.unLockTime - stakeRequest.stakeTime) / 4) {
+        if (block.timestamp < (stakeRequest.stakeTime + (stakeRequest.unLockTime - stakeRequest.stakeTime) / 4)) {
             revert NotClaimTime();
         }
 
         stakedAmount[msg.sender] -= stakeRequest.amount;
         totalStaked -= stakeRequest.amount;
 
-        // Remove the stake request from the user's list
-        userStakeRequests[msg.sender].remove(stakeRequestId);
-
-        // If the full lock period has passed, calculate and add the staking rewards
-        uint256 totalReward = block.timestamp > stakeRequest.unLockTime ? _calculateReward(stakeRequest) : 0;
-
-        // Transfer the claimed amount (principal + rewards) to the user
-        rewardToken.safeTransfer(stakeRequest.owner, stakeRequest.amount + totalReward);
-        // stakedAmount[stakeRequest.owner] -= stakeRequest.amount;
-
         // Mark the stake request as claimed
         stakeRequests[stakeRequestId].claimed = true;
 
+        // Remove the stake request from the user's list
+        userStakeRequests[msg.sender].remove(stakeRequestId);
+
+        // Transfer the claimed amount (principal + rewards) to the user
+        stakeToken.safeTransfer(stakeRequest.owner, stakeRequest.amount);
+
+        // If the full lock period has passed, calculate and add the staking rewards
+        uint256 reward = 0;
+        if (block.timestamp >= stakeRequest.unLockTime) {
+            reward = _calculateReward(stakeRequest);
+            rewardToken.safeTransfer(stakeRequest.owner, reward);
+        }
+
         // Emit an event logging the claim details
-        emit Claimed(msg.sender, stakeRequestId, stakeRequest.amount, totalReward);
+        emit Claimed(msg.sender, stakeRequestId, stakeRequest.amount, reward);
+    }
+
+    function withdraw(address token, address to, uint256 amount) external onlyOwner {
+        _paid(token, to, amount);
+        emit Withdrawn(token, to, amount);
     }
 
     /**
@@ -387,20 +413,34 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
      * @return The sorted array of StakeEvent events.
      */
     function _sortEvents(StakeEvent[] memory events) internal pure returns (StakeEvent[] memory) {
-        uint256 n = events.length;
-        // Outer loop for each pass over the events array.
-        for (uint256 i = 0; i < n; i++) {
-            // Inner loop for comparing adjacent elements.
-            for (uint256 j = 0; j < n - 1; j++) {
-                // Check if the current event should be swapped with the next event.
-                if (
-                    events[j].time > events[j + 1].time || // Sort by time in ascending order.
-                    (events[j].time == events[j + 1].time && events[j].isStart && !events[j + 1].isStart) // Prioritize 'isStart' events.
-                ) {
-                    // Swap the events if the conditions are met.
-                    StakeEvent memory temp = events[j];
-                    events[j] = events[j + 1];
-                    events[j + 1] = temp;
+        // uint256 n = events.length;
+        // // Outer loop for each pass over the events array.
+        // for (uint256 i = 0; i < n; i++) {
+        //     // Inner loop for comparing adjacent elements.
+        //     for (uint256 j = 0; j < n - 1; j++) {
+        //         // Check if the current event should be swapped with the next event.
+        //         if (
+        //             events[j].time > events[j + 1].time || // Sort by time in ascending order.
+        //             (events[j].time == events[j + 1].time && events[j].isStart && !events[j + 1].isStart) // Prioritize 'isStart' events.
+        //         ) {
+        //             // Swap the events if the conditions are met.
+        //             StakeEvent memory temp = events[j];
+        //             events[j] = events[j + 1];
+        //             events[j + 1] = temp;
+        //         }
+        //     }
+        // }
+
+        for (uint256 i = 0; i < events.length - 1; i++) {
+            for (uint256 j = 0; j < events.length - i - 1; j++) {
+                if (events[j].time > events[j + 1].time) {
+                    // Swap nếu thời gian của sự kiện j > sự kiện j+1
+                    (events[j], events[j + 1]) = (events[j + 1], events[j]);
+                } else if (events[j].time == events[j + 1].time) {
+                    // Nếu thời gian giống nhau, ưu tiên sự kiện có isStart == true
+                    if (!events[j].isStart && events[j + 1].isStart) {
+                        (events[j], events[j + 1]) = (events[j + 1], events[j]);
+                    }
                 }
             }
         }
@@ -425,6 +465,20 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
     }
 
     /**
+     * @dev Uses and increments the nonce for the given owner.
+     * @param owner The address of the owner.
+     * @return The current nonce before incrementing.
+     */
+    function _useNonce(address owner) internal returns (uint256) {
+        // For each account, the nonce has an initial value of 0, can only be incremented by one, and cannot be
+        // decremented or reset. This guarantees that the nonce never overflows.
+        unchecked {
+            // It is important to do x++ and not ++x here.
+            return nonces[owner]++;
+        }
+    }
+
+    /**
      * @dev Generates a unique hash for a stake request.
      *
      * This function creates a unique identifier for a stake request by hashing the user's address,
@@ -436,7 +490,15 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
      *
      * @return bytes32 A unique hash representing the stake request.
      */
-    function _hashStakeRequest(address user, uint256 amount) internal view returns (bytes32) {
-        return keccak256(abi.encodePacked(user, amount, block.timestamp));
+    function _hashStakeRequest(address user, uint256 amount, uint256 nonce) internal view returns (bytes32) {
+        return keccak256(abi.encodePacked(user, amount, nonce, block.timestamp));
+    }
+
+    function _paid(address token, address to, uint256 amount) internal {
+        if (token == address(0)) {
+            payable(to).sendValue(amount);
+        } else {
+            IERC20Upgradeable(token).safeTransfer(to, amount);
+        }
     }
 }

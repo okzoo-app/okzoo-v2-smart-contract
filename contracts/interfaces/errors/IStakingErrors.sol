@@ -5,11 +5,14 @@ interface IStakingErrors {
     error ZeroAddress();
     error InvalidAmount();
     error InsufficientStakedAmount();
+    error InsufficientBalance();
     error NotRequestOwner();
     error AlreadyClaimed();
+    error NotStakeTime();
     error NotClaimTime();
     error NotEmergencyWithdraw();
 
     error InvalidTier();
     error InvalidBaseAPR();
+    error InvalidLockPeriod();
 }
