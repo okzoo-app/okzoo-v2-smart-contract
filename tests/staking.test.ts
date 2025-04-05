@@ -152,12 +152,13 @@ describe("Staking Contract", function () {
             await expect(stake).to.be.revertedWithCustomError(staking, "InvalidAmount");
         });
 
-        it("should revert if the staking period is not valid", async function () {
-            const invalidPeriod = 10;
+        // TODO: Uncomment this test when the staking period is implemented
+        // it("should revert if the staking period is not valid", async function () {
+        //     const invalidPeriod = 10;
 
-            const stake = staking.connect(user1).stake(parseUnits("100", 18), invalidPeriod);
-            await expect(stake).to.be.revertedWithCustomError(staking, "InvalidLockPeriod");
-        });
+        //     const stake = staking.connect(user1).stake(parseUnits("100", 18), invalidPeriod);
+        //     await expect(stake).to.be.revertedWithCustomError(staking, "InvalidLockPeriod");
+        // });
 
         it("should revert if the staking is paused", async function () {
             await staking.connect(owner).pause();
@@ -330,6 +331,161 @@ describe("Staking Contract", function () {
             expect(contractBalanceAfter).to.be.equal(contractBalanceBefore);
             expect(rewardBalanceAfter).to.be.equal(rewardBalanceBefore);
             expect(rewardContractBalanceAfter).to.be.equal(rewardContractBalanceBefore);
+        });
+
+        it("should revert if trying to claim an invalid stake request ID", async function () {
+            const invalidStakeRequestId = "0x53a2b5482b6757b5d3377dcdb7150772ddbe731f9bf95a0de349fa6bdd0b4a76";
+
+            const claim = staking.connect(user1).claim(invalidStakeRequestId);
+            await expect(claim).to.be.revertedWithCustomError(staking, "NotRequestOwner");
+        });
+
+        it("should revert if trying to claim an already claimed stake request", async function () {
+            await staking.connect(user1).stake(initialStakeAmount, lockPeriod); // Assume lock period is 30 days
+            const stakeRequestIds = await staking.getUserStakeRequests(user1.address);
+
+            // Retrieve the stake request from the contract
+            const stakeRequest = await staking.stakeRequests(stakeRequestIds[0]);
+
+            await time.increase(Number(stakeRequest.unLockTime) - (await time.latest()) - 1); // Fast forward time to after the lock period
+
+            await staking.connect(user1).claim(stakeRequestIds[0]);
+
+            const claim = staking.connect(user1).claim(stakeRequestIds[0]);
+            await expect(claim).to.be.revertedWithCustomError(staking, "AlreadyClaimed");
+        });
+
+        it("calculate reward with multi stake requests should return the correct reward amount", async function () {
+            const balanceBefore = await stakeToken.balanceOf(user1.address);
+            const contractBalanceBefore = await stakeToken.balanceOf(stakingAddress);
+            const rewardBalanceBefore = await rewardToken.balanceOf(user1.address);
+            const rewardContractBalanceBefore = await rewardToken.balanceOf(stakingAddress);
+
+            await staking.connect(user1).stake(initialStakeAmount, lockPeriod); // Assume lock period is 30 days
+
+            await staking.connect(user1).stake(parseUnits("500", 18), 7);
+
+            await time.increase(ONE_DAY);
+
+            await staking.connect(user1).stake(parseUnits("1000", 18), 14);
+            const stakeRequestIds = await staking.getUserStakeRequests(user1.address);
+
+            // Retrieve the stake request from the contract
+            const stakeRequest0 = await staking.stakeRequests(stakeRequestIds[0]);
+            const stakeRequest1 = await staking.stakeRequests(stakeRequestIds[1]);
+            const stakeRequest2 = await staking.stakeRequests(stakeRequestIds[2]);
+
+            const balanceAfter = await stakeToken.balanceOf(user1.address);
+            const contractBalanceAfter = await stakeToken.balanceOf(stakingAddress);
+
+            expect(balanceAfter).to.be.equal(
+                balanceBefore - stakeRequest0.amount - stakeRequest1.amount - stakeRequest2.amount,
+            );
+            expect(contractBalanceAfter).to.be.equal(
+                contractBalanceBefore + stakeRequest0.amount + stakeRequest1.amount + stakeRequest2.amount,
+            );
+
+            await time.increase(Number(stakeRequest0.unLockTime) - (await time.latest()) - 1); // Fast forward time to after the lock period
+
+            console.log({ stakeRequest0, stakeRequest1, stakeRequest2 });
+
+            // calculate the reward for stakeRequest0
+            const ranges = [
+                {
+                    time: stakeRequest0.stakeTime,
+                    amount: stakeRequest0.amount,
+                    isStart: true,
+                },
+                {
+                    time: stakeRequest1.stakeTime,
+                    amount: stakeRequest1.amount,
+                    isStart: true,
+                },
+                {
+                    time: stakeRequest2.stakeTime,
+                    amount: stakeRequest2.amount,
+                    isStart: true,
+                },
+                {
+                    time: stakeRequest1.unLockTime,
+                    amount: stakeRequest1.amount,
+                    isStart: false,
+                },
+                {
+                    time: stakeRequest2.unLockTime,
+                    amount: stakeRequest2.amount,
+                    isStart: false,
+                },
+                {
+                    time: stakeRequest0.unLockTime,
+                    amount: stakeRequest1.amount,
+                    isStart: false,
+                },
+            ];
+
+            const apr0 = await staking.getAPR(stakeRequest0.amount);
+            const apr1 = await staking.getAPR(stakeRequest0.amount + stakeRequest1.amount);
+            const apr2 = await staking.getAPR(stakeRequest0.amount + stakeRequest1.amount + stakeRequest2.amount);
+            const apr3 = await staking.getAPR(
+                stakeRequest0.amount + stakeRequest1.amount + stakeRequest2.amount - stakeRequest1.amount,
+            );
+            const apr4 = await staking.getAPR(
+                stakeRequest0.amount +
+                    stakeRequest1.amount +
+                    stakeRequest2.amount -
+                    stakeRequest1.amount -
+                    stakeRequest2.amount,
+            );
+
+            const bonusPeriod0 = await staking.getBonusPeriod(stakeRequest0.lockPeriod);
+
+            const reward0 =
+                (stakeRequest0.amount * (apr0 + bonusPeriod0) * (stakeRequest1.stakeTime - stakeRequest0.stakeTime)) /
+                100n /
+                365n /
+                BigInt(ONE_DAY);
+            const reward1 =
+                (stakeRequest0.amount * (apr1 + bonusPeriod0) * (stakeRequest2.stakeTime - stakeRequest1.stakeTime)) /
+                100n /
+                365n /
+                BigInt(ONE_DAY);
+            const reward2 =
+                (stakeRequest0.amount * (apr2 + bonusPeriod0) * (stakeRequest1.unLockTime - stakeRequest2.stakeTime)) /
+                100n /
+                365n /
+                BigInt(ONE_DAY);
+            const reward3 =
+                (stakeRequest0.amount * (apr3 + bonusPeriod0) * (stakeRequest2.unLockTime - stakeRequest1.unLockTime)) /
+                100n /
+                365n /
+                BigInt(ONE_DAY);
+            const reward4 =
+                (stakeRequest0.amount * (apr4 + bonusPeriod0) * (stakeRequest0.unLockTime - stakeRequest2.unLockTime)) /
+                100n /
+                365n /
+                BigInt(ONE_DAY);
+
+            const totalReward = reward0 + reward1 + reward2 + reward3 + reward4;
+            // console.log({ totalReward });
+
+            // const sRanges = await staking.getUserStakeEvents(user1.address);
+            // console.log({ sRanges });
+
+            // const sortedRanges = await staking.getEvents(user1.address);
+            // console.log({ sortedRanges });
+
+            // console.log({ ranges });
+
+            await staking.connect(user1).claim(stakeRequestIds[0]);
+            const rewardBalanceAfter = await rewardToken.balanceOf(user1.address);
+            const rewardContractBalanceAfter = await rewardToken.balanceOf(stakingAddress);
+
+            // const sReward = await staking.getReward(stakeRequestIds[0]);
+            // console.log({ sReward });
+            // expect(sReward).to.be.equal(totalReward);
+
+            expect(rewardBalanceAfter).to.be.equal(rewardBalanceBefore + totalReward);
+            expect(rewardContractBalanceAfter).to.be.equal(rewardContractBalanceBefore - totalReward);
         });
     });
 

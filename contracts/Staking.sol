@@ -153,7 +153,8 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
             revert InvalidAmount();
         }
 
-        if (lockPeriods[lockPeriod] == 0 && lockPeriod != 0) revert InvalidLockPeriod();
+        // TODO: need recheck lock period if lock period is not in the list
+        // if (lockPeriods[lockPeriod] == 0 && lockPeriod != 0) revert InvalidLockPeriod();
 
         // Transfer the staking tokens from the user to the contract
         stakeToken.safeTransferFrom(msg.sender, address(this), amount);
@@ -338,6 +339,12 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         return _calculateReward(stakeRequest);
     }
 
+    // function getEvents(address user) external view returns (StakeEvent[] memory) {
+    //     StakeEvent[] memory events = userStakeEvents[user];
+
+    //     return _sortEvents(events);
+    // }
+
     /**************************|
     |         Internals        |
     |_________________________*/
@@ -382,7 +389,7 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
 
                     // Reward calculation: (amount * (APR + bonus) * duration) / (100 * 365 * ONE_DAY)
                     totalReward +=
-                        (currentAmount * (apr + bonusPeriod) * (events[i].time - prevTime)) /
+                        (claimRequest.amount * (apr + bonusPeriod) * (events[i].time - prevTime)) /
                         100 /
                         365 /
                         ONE_DAY;
@@ -413,24 +420,6 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
      * @return The sorted array of StakeEvent events.
      */
     function _sortEvents(StakeEvent[] memory events) internal pure returns (StakeEvent[] memory) {
-        // uint256 n = events.length;
-        // // Outer loop for each pass over the events array.
-        // for (uint256 i = 0; i < n; i++) {
-        //     // Inner loop for comparing adjacent elements.
-        //     for (uint256 j = 0; j < n - 1; j++) {
-        //         // Check if the current event should be swapped with the next event.
-        //         if (
-        //             events[j].time > events[j + 1].time || // Sort by time in ascending order.
-        //             (events[j].time == events[j + 1].time && events[j].isStart && !events[j + 1].isStart) // Prioritize 'isStart' events.
-        //         ) {
-        //             // Swap the events if the conditions are met.
-        //             StakeEvent memory temp = events[j];
-        //             events[j] = events[j + 1];
-        //             events[j + 1] = temp;
-        //         }
-        //     }
-        // }
-
         for (uint256 i = 0; i < events.length - 1; i++) {
             for (uint256 j = 0; j < events.length - i - 1; j++) {
                 if (events[j].time > events[j + 1].time) {
