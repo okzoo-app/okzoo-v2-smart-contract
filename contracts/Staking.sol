@@ -266,10 +266,16 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
 
         // Withdraw staking amount
         uint256 claimAmount = stakedAmount[msg.sender];
+
+        if (claimAmount == 0) {
+            revert InsufficientStakedAmount();
+        }
+
         stakedAmount[msg.sender] = 0;
         totalStaked -= claimAmount;
 
         bytes32[] memory stakeRequestIds = getUserStakeRequests(msg.sender);
+
         // Withdraw all unstake requests
         for (uint256 i; i < stakeRequestIds.length; i++) {
             bytes32 unstakeRequestId = stakeRequestIds[i];

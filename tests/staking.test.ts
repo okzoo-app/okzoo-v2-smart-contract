@@ -387,7 +387,7 @@ describe("Staking Contract", function () {
 
             await time.increase(Number(stakeRequest0.unLockTime) - (await time.latest()) - 1); // Fast forward time to after the lock period
 
-            console.log({ stakeRequest0, stakeRequest1, stakeRequest2 });
+            // console.log({ stakeRequest0, stakeRequest1, stakeRequest2 });
 
             // calculate the reward for stakeRequest0
             const ranges = [
@@ -489,26 +489,73 @@ describe("Staking Contract", function () {
         });
     });
 
-    // describe("Emergency Withdrawals", function () {
-    //     it("should allow emergency withdrawal when enabled", async function () {
-    //         await staking.connect(owner).setIsEmergencyWithdraw(true);
+    describe("Emergency Withdrawals", function () {
+        beforeEach(async function () {
+            // Approve the staking contract to spend the user's tokens
+            await stakeToken.connect(user1).approve(stakingAddress, parseUnits("100000", 18));
+            await stakeToken.connect(user2).approve(stakingAddress, parseUnits("100000", 18));
+        });
+        it("should allow emergency withdrawal when enabled", async function () {
+            const balanceBefore = await stakeToken.balanceOf(user1.address);
+            const contractBalanceBefore = await stakeToken.balanceOf(stakingAddress);
 
-    //         await stakeToken.connect(user1).approve(staking.address, initialStakeAmount);
-    //         await staking.connect(user1).stake(initialStakeAmount, 30);
+            await staking.connect(user1).stake(initialStakeAmount, lockPeriod);
+            await staking.connect(user1).stake(parseUnits("500", 18), 7);
+            await staking.connect(user1).stake(parseUnits("1000", 18), 14);
 
-    //         // Trigger emergency withdrawal
-    //         const balanceBefore = await stakeToken.balanceOf(user1.address);
-    //         await staking.connect(user1).emergencyWithdraw();
+            await staking.connect(owner).pause();
+            await staking.connect(owner).setIsEmergencyWithdraw(true);
 
-    //         const balanceAfter = await stakeToken.balanceOf(user1.address);
-    //         expect(balanceAfter).to.be.gt(balanceBefore);
-    //     });
+            // Trigger emergency withdrawal
+            await staking.connect(user1).emergencyWithdraw();
 
-    //     it("should revert if emergency withdraw is not enabled", async function () {
-    //         await stakeToken.connect(user1).approve(staking.address, initialStakeAmount);
-    //         await staking.connect(user1).stake(initialStakeAmount, 30);
+            const balanceAfter = await stakeToken.balanceOf(user1.address);
+            const contractBalanceAfter = await stakeToken.balanceOf(stakingAddress);
+            expect(balanceAfter).to.be.equal(balanceBefore);
+            expect(contractBalanceAfter).to.be.equal(contractBalanceBefore);
+        });
 
-    //         await expect(staking.connect(user1).emergencyWithdraw()).to.be.revertedWith("NotEmergencyWithdraw");
-    //     });
-    // });
+        it("should revert if emergency withdraw is not enabled", async function () {
+            await staking.connect(user1).stake(initialStakeAmount, 30);
+
+            await expect(staking.connect(user1).emergencyWithdraw()).to.be.rejectedWith("Pausable: not paused");
+        });
+
+        it("should revert if the user has no staked tokens", async function () {
+            await staking.connect(owner).pause();
+            await staking.connect(owner).setIsEmergencyWithdraw(true);
+
+            await expect(staking.connect(user1).emergencyWithdraw()).to.be.revertedWithCustomError(
+                staking,
+                "InsufficientStakedAmount",
+            );
+        });
+
+        it("should allow owner to withdraw tokens", async function () {
+            await staking.connect(user1).stake(initialStakeAmount, lockPeriod);
+
+            const balanceBefore = await stakeToken.balanceOf(owner.address);
+            const contractBalanceBefore = await stakeToken.balanceOf(stakingAddress);
+
+            await staking.connect(owner).withdraw(stakeAddress, owner.address, initialStakeAmount);
+
+            const balanceAfter = await stakeToken.balanceOf(owner.address);
+            const contractBalanceAfter = await stakeToken.balanceOf(stakingAddress);
+            expect(balanceAfter).to.be.equal(balanceBefore + initialStakeAmount);
+            expect(contractBalanceAfter).to.be.equal(contractBalanceBefore - initialStakeAmount);
+        });
+
+        it("should revert if the owner tries to withdraw more than the contract balance", async function () {
+            await staking.connect(user1).stake(initialStakeAmount, lockPeriod);
+
+            const withdraw = staking.connect(owner).withdraw(stakeAddress, owner.address, mintAmount);
+            await expect(withdraw).to.be.rejectedWith("ERC20: transfer amount exceeds balance");
+        });
+
+        it("should revert if a non-owner tries to withdraw tokens", async function () {
+            await staking.connect(user1).stake(initialStakeAmount, lockPeriod);
+            const withdraw = staking.connect(user1).withdraw(stakeAddress, user1.address, initialStakeAmount);
+            await expect(withdraw).to.be.rejectedWith("Ownable: caller is not the owner");
+        });
+    });
 });
