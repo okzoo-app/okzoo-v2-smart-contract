@@ -4,8 +4,8 @@ import { OkzooV2, OkzooV2__factory } from "../typechain-types";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { EIP712Domain, EIP712TypeDefinition } from "../helpers/EIP712.type";
-import { ConfigOkzooV2 } from "../scripts/config";
 import { signTypedData } from "../helpers/EIP712";
+import config from "../scripts/configs/OkzooV2";
 
 enum EvolutionStage {
     Protoform,
@@ -28,7 +28,7 @@ describe("OkzooV2", function () {
         const OkzooV2 = <OkzooV2__factory>await ethers.getContractFactory("OkzooV2");
         okzoo = await OkzooV2.deploy();
 
-        await okzoo.initialize(owner.address, verifier.address, ConfigOkzooV2.domain, ConfigOkzooV2.version);
+        await okzoo.initialize(owner.address, verifier.address, config.domain, config.version);
 
         okzooAddress = await okzoo.getAddress();
     });
@@ -487,8 +487,8 @@ const getCheckInSignature = async (
     };
 
     const domain: EIP712Domain = {
-        name: ConfigOkzooV2.domain,
-        version: ConfigOkzooV2.version,
+        name: config.domain,
+        version: config.version,
         chainId: chainId,
         verifyingContract: verifyingContract,
     };
@@ -524,8 +524,8 @@ const getEvolveSignature = async (
     };
 
     const domain: EIP712Domain = {
-        name: ConfigOkzooV2.domain,
-        version: ConfigOkzooV2.version,
+        name: config.domain,
+        version: config.version,
         chainId: chainId,
         verifyingContract: verifyingContract,
     };

@@ -1,32 +1,64 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import {IStakingErrors} from "./interfaces/errors/IStakingErrors.sol";
-import {IStaking} from "./interfaces/IStaking.sol";
+import {AddressUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {SafeERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import {EnumerableSetUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
+import {IStakingErrors} from "./interfaces/errors/IStakingErrors.sol";
+import {IStaking} from "./interfaces/IStaking.sol";
 
+/**
+ * @title Staking Contract
+ * @dev Implements staking functionality with tiers, lock periods, and reward distribution.
+ */
 contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
+    using AddressUpgradeable for address payable;
+
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.Bytes32Set;
 
-    uint256 public constant MAXIMUM_UNLOCK_REQUESTS = 5;
+    uint256 private constant ONE_DAY = 60; //TODO: change to 1 days
 
-    IERC20Upgradeable public stakeToken;
-    uint256 public unstakeLockTime;
-    uint256 public totalStaked;
+    // uint256 public constant MAXIMUM_STAKE_REQUESTS = 15;
+    uint256 public startTime;
+    uint256 public endTime;
+    uint256 public maxCap; // Maximum staking cap
+    uint256 public minStakeAmount; // Minimum amount allowed to stake
 
-    mapping(address => uint256) public stakedAmount;
-    mapping(bytes32 => UnstakeRequest) public unstakeRequests;
-    mapping(address => EnumerableSetUpgradeable.Bytes32Set) private userUnstakeRequests;
+    IERC20Upgradeable public stakeToken; // ERC20 token used for staking
+    IERC20Upgradeable public rewardToken; // ERC20 token used for rewards
+    uint256 public totalStaked; // Total staked amount
+
+    mapping(uint256 => Tier) public tiers; // Staking tiers
+    mapping(uint256 => uint256) public lockPeriods; // Lock period bonuses
+
+    mapping(address => uint256) public stakedAmount; // Tracks user staked amounts
+    mapping(bytes32 => StakeRequest) public stakeRequests; // Maps stake requests by ID
+    mapping(address => EnumerableSetUpgradeable.Bytes32Set) private userStakeRequests; // Tracks stake request IDs for each user
+    mapping(address => StakeEvent[]) private userStakeEvents; // Tracks stake events for each user
     // Use for emergency withdraw
     bool public isEmergencyWithdraw;
 
-    function initialize(address _stakeToken, uint256 _unstakeLockTime, address _owner) public initializer {
+    mapping(address => uint256) public nonces;
+
+    /**
+     * @dev Initializes the staking contract.
+     */
+    function initialize(
+        address _owner,
+        address _stakeToken,
+        address _rewardToken,
+        uint256 _startTime,
+        uint256 _endTime,
+        uint256 _maxCap,
+        uint256 _minStakeAmount,
+        Tier[] calldata _tiers,
+        LockPeriod[] calldata _lockPeriods
+    ) public initializer {
         __Ownable_init();
         __Pausable_init();
         __ReentrancyGuard_init();
@@ -35,35 +67,28 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
             revert ZeroAddress();
         }
         stakeToken = IERC20Upgradeable(_stakeToken);
-        unstakeLockTime = _unstakeLockTime;
+        rewardToken = IERC20Upgradeable(_rewardToken);
+        startTime = _startTime;
+        endTime = _endTime;
+        maxCap = _maxCap;
+        minStakeAmount = _minStakeAmount;
 
         transferOwnership(_owner);
-    }
 
-    /**************************|
-    |          Getters         |
-    |_________________________*/
-
-    /**
-     * @dev Get available unstake request
-     * @param _user The user address
-     */
-    function getUserUnstakeRequests(address _user) public view returns (bytes32[] memory) {
-        return userUnstakeRequests[_user].values();
+        for (uint256 i = 0; i < _tiers.length; i++) {
+            if (_tiers[i].maxStake == 0) {
+                revert InvalidTier();
+            }
+            tiers[i] = _tiers[i];
+        }
+        for (uint256 i = 0; i < _lockPeriods.length; i++) {
+            lockPeriods[_lockPeriods[i].daysLocked] = _lockPeriods[i].aprBonus;
+        }
     }
 
     /**************************|
     |          Setters         |
     |_________________________*/
-
-    /**
-     * @dev Set the unstake lock time
-     * @param _unstakeLockTime The new start time
-     */
-    function setUnstakeLockTime(uint256 _unstakeLockTime) external onlyOwner {
-        emit UnstakeLockTimeChanged(unstakeLockTime, _unstakeLockTime);
-        unstakeLockTime = _unstakeLockTime;
-    }
 
     /**
      * @dev Set the emergency unstake
@@ -78,10 +103,16 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
     |         Pausable         |
     |_________________________*/
 
+    /**
+     * @dev Allows the contract owner to pause staking operations.
+     */
     function pause() external onlyOwner {
         _pause();
     }
 
+    /**
+     * @dev Allows the contract owner to unpause staking operations.
+     */
     function unpause() external onlyOwner {
         _unpause();
     }
@@ -91,101 +122,137 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
     |_________________________*/
 
     /**
-     * @dev Stake tokens
-     * @param amount The amount to stake
+     * @dev Allows a user to stake a specified amount of tokens for a given lock period.
+     *      The staked tokens are transferred to the contract, and a new stake request is created.
+     *      The request is tracked and used to calculate rewards upon claim.
+     *
+     * @param amount The amount of tokens the user wants to stake.
+     * @param lockPeriod The lock period (in days) for the staked tokens.
+     *
+     * Requirements:
+     * - The staking amount must be greater than `minStakeAmount` and within the `maxCap`.
+     * - The contract must not be paused.
+     * - The function is protected against reentrancy attacks.
+     *
+     * Effects:
+     * - Transfers `amount` of `stakeToken` from the user to the contract.
+     * - Creates a unique stake request using `_hashStakeRequest`.
+     * - Records the stake request in `stakeRequests` and links it to the user.
+     * - Updates `userStakeRequests` and `userStakeEvents` for reward calculation.
+     * - Increments the total staked amount.
+     * - Emits a `Staked` event with details of the stake.
      */
-    function stake(uint256 amount) external nonReentrant whenNotPaused {
-        if (amount == 0) {
+    function stake(uint256 amount, uint256 lockPeriod) external nonReentrant whenNotPaused {
+        // Check if the current time is past the allowed staking period
+        if (block.timestamp < startTime || endTime < block.timestamp) {
+            revert NotStakeTime();
+        }
+
+        // Ensure the staking amount is within the allowed limits
+        if (amount < minStakeAmount || totalStaked + amount > maxCap) {
             revert InvalidAmount();
         }
 
+        // TODO: need recheck lock period if lock period is not in the list
+        // if (lockPeriods[lockPeriod] == 0 && lockPeriod != 0) revert InvalidLockPeriod();
+
+        // Transfer the staking tokens from the user to the contract
         stakeToken.safeTransferFrom(msg.sender, address(this), amount);
 
-        stakedAmount[msg.sender] += amount;
-        totalStaked += amount;
+        // Generate a unique ID for the stake request
+        bytes32 stakeRequestId = _hashStakeRequest(msg.sender, amount, _useNonce(msg.sender));
 
-        emit Staked(msg.sender, amount);
-    }
-
-    /**
-     * @dev Unstakes tokens
-     * @param amount The amount to unstake
-     */
-    function unstake(uint256 amount) external nonReentrant whenNotPaused returns (bytes32 unstakeRequestId) {
-        if (amount == 0) {
-            revert InvalidAmount();
-        }
-
-        if (stakedAmount[msg.sender] < amount) {
-            revert InsufficientStakedAmount();
-        }
-
-        if (userUnstakeRequests[msg.sender].length() >= MAXIMUM_UNLOCK_REQUESTS) {
-            revert MaximumUnstakeRequestReached();
-        }
-
-        stakedAmount[msg.sender] -= amount;
-        totalStaked -= amount;
-
-        unstakeRequestId = _hashUnstakeRequest(msg.sender, amount);
-        if (unstakeRequests[unstakeRequestId].amount != 0) {
-            revert DuplicateUnstakeRequest();
-        }
-
-        uint256 claimTime = block.timestamp + unstakeLockTime;
-
-        unstakeRequests[unstakeRequestId] = UnstakeRequest({
+        // Create the stake request object
+        StakeRequest memory stakeRequest = StakeRequest({
             owner: msg.sender,
             amount: amount,
-            claimTime: claimTime,
+            lockPeriod: lockPeriod,
+            stakeTime: block.timestamp,
+            unLockTime: block.timestamp + lockPeriod * ONE_DAY,
             claimed: false
         });
 
-        userUnstakeRequests[msg.sender].add(unstakeRequestId);
+        // Store the stake request
+        stakeRequests[stakeRequestId] = stakeRequest;
 
-        emit Unstake(msg.sender, unstakeRequestId, amount, claimTime);
+        // Track the user's stake requests
+        userStakeRequests[msg.sender].add(stakeRequestId);
+
+        // Add the stake to the user's staking history (used for reward calculations)
+        userStakeEvents[msg.sender].push(StakeEvent(stakeRequest.stakeTime, stakeRequest.amount, true));
+        userStakeEvents[msg.sender].push(StakeEvent(stakeRequest.unLockTime, stakeRequest.amount, false));
+
+        // Update the user's and the contract's total staked amount
+        stakedAmount[msg.sender] += amount;
+        totalStaked += amount;
+
+        // Emit an event to log the staking action
+        emit Staked(msg.sender, stakeRequestId, amount, lockPeriod);
     }
 
     /**
-     * @dev Claim multiple unstaked requests
-     * @param unstakeRequestIds The unstake request ids
+     * @dev Allows a user to claim their staked tokens and potential rewards.
+     *      Users can only claim their stake after at least 1/4 of the lock period has passed.
+     *      If the lock period has fully ended, rewards will be included in the claim.
+     *
+     * @param stakeRequestId The unique identifier of the stake request being claimed.
+     *
+     * Requirements:
+     * - The caller must be the owner of the stake request.
+     * - The stake request must not have been claimed already.
+     * - The current time must be at least (unlockTime - 1/4 of the lock period).
+     *
+     * Effects:
+     * - If the lock period has ended, calculates and adds rewards to the claimable amount.
+     * - Transfers the staked amount (and rewards, if applicable) to the user.
+     * - Marks the stake request as claimed.
+     * - Emits a `Claimed` event with details of the claim.
      */
-    function claimMultiple(bytes32[] calldata unstakeRequestIds) external nonReentrant whenNotPaused {
-        for (uint256 i; i < unstakeRequestIds.length; i++) {
-            _claim(unstakeRequestIds[i]);
-        }
-    }
+    function claim(bytes32 stakeRequestId) external nonReentrant whenNotPaused {
+        // Retrieve the stake request
+        StakeRequest memory stakeRequest = stakeRequests[stakeRequestId];
 
-    /**
-     * @dev Claim unstaked request
-     * @notice Claim can only be called after the unstaking period has ended
-     * @param unstakeRequestId The unstake request id
-     */
-    function claim(bytes32 unstakeRequestId) external nonReentrant whenNotPaused {
-        _claim(unstakeRequestId);
-    }
-
-    function _claim(bytes32 unstakeRequestId) internal {
-        UnstakeRequest memory unstakeRequest = unstakeRequests[unstakeRequestId];
-
-        if (unstakeRequest.owner != msg.sender) {
+        // Ensure that the caller is the owner of the stake request
+        if (stakeRequest.owner != msg.sender) {
             revert NotRequestOwner();
         }
 
-        if (block.timestamp < unstakeRequest.claimTime) {
-            revert NotClaimTime();
-        }
-
-        if (unstakeRequest.claimed) {
+        // Ensure the stake request has not been claimed already
+        if (stakeRequest.claimed) {
             revert AlreadyClaimed();
         }
 
-        unstakeRequests[unstakeRequestId].claimed = true;
-        userUnstakeRequests[msg.sender].remove(unstakeRequestId);
+        // Ensure the claim is being made after at least 1/4 of the lock period has passed
+        if (block.timestamp < (stakeRequest.stakeTime + (stakeRequest.unLockTime - stakeRequest.stakeTime) / 4)) {
+            revert NotClaimTime();
+        }
 
-        stakeToken.safeTransfer(msg.sender, unstakeRequest.amount);
+        stakedAmount[msg.sender] -= stakeRequest.amount;
+        totalStaked -= stakeRequest.amount;
 
-        emit Claimed(msg.sender, unstakeRequestId, unstakeRequest.amount);
+        // Mark the stake request as claimed
+        stakeRequests[stakeRequestId].claimed = true;
+
+        // Remove the stake request from the user's list
+        userStakeRequests[msg.sender].remove(stakeRequestId);
+
+        // Transfer the claimed amount (principal + rewards) to the user
+        stakeToken.safeTransfer(stakeRequest.owner, stakeRequest.amount);
+
+        // If the full lock period has passed, calculate and add the staking rewards
+        uint256 reward = 0;
+        if (block.timestamp >= stakeRequest.unLockTime) {
+            reward = _calculateReward(stakeRequest);
+            rewardToken.safeTransfer(stakeRequest.owner, reward);
+        }
+
+        // Emit an event logging the claim details
+        emit Claimed(msg.sender, stakeRequestId, stakeRequest.amount, reward);
+    }
+
+    function withdraw(address token, address to, uint256 amount) external onlyOwner {
+        _paid(token, to, amount);
+        emit Withdrawn(token, to, amount);
     }
 
     /**
@@ -199,18 +266,23 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
 
         // Withdraw staking amount
         uint256 claimAmount = stakedAmount[msg.sender];
+
+        if (claimAmount == 0) {
+            revert InsufficientStakedAmount();
+        }
+
         stakedAmount[msg.sender] = 0;
         totalStaked -= claimAmount;
 
-        bytes32[] memory unstakeRequestIds = getUserUnstakeRequests(msg.sender);
+        bytes32[] memory stakeRequestIds = getUserStakeRequests(msg.sender);
+
         // Withdraw all unstake requests
-        for (uint256 i; i < unstakeRequestIds.length; i++) {
-            bytes32 unstakeRequestId = unstakeRequestIds[i];
+        for (uint256 i; i < stakeRequestIds.length; i++) {
+            bytes32 unstakeRequestId = stakeRequestIds[i];
 
-            claimAmount += unstakeRequests[unstakeRequestId].amount;
-            unstakeRequests[unstakeRequestId].claimed = true;
+            stakeRequests[unstakeRequestId].claimed = true;
 
-            userUnstakeRequests[msg.sender].remove(unstakeRequestId);
+            userStakeRequests[msg.sender].remove(unstakeRequestId);
         }
 
         if (claimAmount == 0) {
@@ -222,7 +294,206 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         emit EmergencyWithdrawn(msg.sender, claimAmount);
     }
 
-    function _hashUnstakeRequest(address user, uint256 amount) internal view returns (bytes32) {
-        return keccak256(abi.encodePacked(user, amount, block.timestamp));
+    /**************************|
+    |          Getters         |
+    |_________________________*/
+
+    /**
+     * @dev Returns the APR for a given stake amount.
+     */
+    function getAPR(uint256 amount) external view returns (uint256) {
+        return _getAPR(amount);
+    }
+
+    /**
+     * @dev Returns the bonus APR for a given lock period.
+     */
+    function getBonusPeriod(uint256 daysLocked) external view returns (uint256) {
+        return lockPeriods[daysLocked];
+    }
+
+    /**
+     * @dev Get available stake request
+     * @param _user The user address
+     */
+    function getUserStakeRequests(address _user) public view returns (bytes32[] memory) {
+        return userStakeRequests[_user].values();
+    }
+
+    /**
+     * @dev Returns a list of user stake ranges.
+     * @param _user The user address
+     */
+    function getUserStakeEvents(address _user) public view returns (StakeEvent[] memory) {
+        return userStakeEvents[_user];
+    }
+
+    /**
+     * @dev Retrieves the total reward for a specific stake request identified by `stakeRequestId`.
+     *      It calculates the reward based on the stake request details such as the stake amount,
+     *      stake time, unlock time, and any other relevant parameters using the `_calculateReward` function.
+     *
+     * @param stakeRequestId The unique identifier for the stake request whose reward is to be calculated.
+     *
+     * @return uint256 The total reward calculated for the given stake request.
+     */
+    function getReward(bytes32 stakeRequestId) external view returns (uint256) {
+        // Retrieve the stake request details using the stakeRequestId
+        StakeRequest memory stakeRequest = stakeRequests[stakeRequestId];
+
+        // Calculate and return the reward based on the stake request details
+        return _calculateReward(stakeRequest);
+    }
+
+    // function getEvents(address user) external view returns (StakeEvent[] memory) {
+    //     StakeEvent[] memory events = userStakeEvents[user];
+
+    //     return _sortEvents(events);
+    // }
+
+    /**************************|
+    |         Internals        |
+    |_________________________*/
+
+    /**
+     * @dev Calculates the total reward for a given stake request based on the staking history.
+     *      The function processes stake events, determines active stake amounts over time,
+     *      and computes rewards accordingly.
+     *
+     * @param claimRequest The stake request for which rewards are being calculated.
+     * @return totalReward The total reward amount accrued for the given stake request.
+     *
+     * Logic:
+     * - Retrieves all stake-related events for the user (deposits and withdrawals).
+     * - Sorts these events in chronological order using `_quickSort`.
+     * - Iterates through the sorted events to track the user's active staked amount.
+     * - Computes the reward based on the APR and any lock period bonus.
+     * - Returns the total calculated reward.
+     *
+     * Assumptions:
+     * - `events` contains all stake start and end times.
+     * - APR is calculated dynamically using `_getAPR(currentAmount)`.
+     * - Lock period bonuses are applied via `lockPeriods[claimRequest.lockPeriod]`.
+     */
+    function _calculateReward(StakeRequest memory claimRequest) internal view returns (uint256 totalReward) {
+        // Retrieve staking history events for the user
+        StakeEvent[] memory events = userStakeEvents[claimRequest.owner];
+
+        // Sort stake events chronologically
+        events = _sortEvents(events);
+
+        uint256 currentAmount = 0; // Tracks the user's active staked amount
+        uint256 prevTime = events[0].time; // Tracks the previous event time
+
+        // Iterate through sorted stake events
+        for (uint256 i = 0; i < events.length; i++) {
+            if (events[i].time != prevTime) {
+                // Only calculate rewards within the stake request period
+                if (prevTime >= claimRequest.stakeTime && events[i].time <= claimRequest.unLockTime) {
+                    uint256 apr = _getAPR(currentAmount); // Get APR for the current stake amount
+                    uint256 bonusPeriod = lockPeriods[claimRequest.lockPeriod]; // Get bonus APR for lock period
+
+                    // Reward calculation: (amount * (APR + bonus) * duration) / (100 * 365 * ONE_DAY)
+                    totalReward +=
+                        (claimRequest.amount * (apr + bonusPeriod) * (events[i].time - prevTime)) /
+                        100 /
+                        365 /
+                        ONE_DAY;
+                }
+                prevTime = events[i].time; // Update the previous event time
+            }
+
+            // Update the active staked amount based on event type
+            if (events[i].isStart) {
+                currentAmount += events[i].amount; // Increase stake amount
+            } else {
+                currentAmount -= events[i].amount; // Decrease stake amount
+            }
+        }
+
+        return totalReward;
+    }
+
+    /**
+     * @dev Sorts an array of StakeEvent events based on the following criteria:
+     *      1. Sort by `time` in ascending order.
+     *      2. If two events have the same `time`, prioritize events where `isStart` is true over those where `isStart` is false.
+     *
+     * This is a bubble sort implementation, which iterates over the array multiple times and swaps elements to sort the events.
+     * The time complexity of this function is O(n^2) due to the nested loops.
+     *
+     * @param events The array of StakeEvent events to be sorted.
+     * @return The sorted array of StakeEvent events.
+     */
+    function _sortEvents(StakeEvent[] memory events) internal pure returns (StakeEvent[] memory) {
+        for (uint256 i = 0; i < events.length - 1; i++) {
+            for (uint256 j = 0; j < events.length - i - 1; j++) {
+                if (events[j].time > events[j + 1].time) {
+                    // Swap nếu thời gian của sự kiện j > sự kiện j+1
+                    (events[j], events[j + 1]) = (events[j + 1], events[j]);
+                } else if (events[j].time == events[j + 1].time) {
+                    // Nếu thời gian giống nhau, ưu tiên sự kiện có isStart == true
+                    if (!events[j].isStart && events[j + 1].isStart) {
+                        (events[j], events[j + 1]) = (events[j + 1], events[j]);
+                    }
+                }
+            }
+        }
+        return events;
+    }
+
+    /**
+     * @dev Returns the APR for a given stake amount.
+     */
+    function _getAPR(uint256 amount) internal view returns (uint256) {
+        uint256 i = 0;
+        while (true) {
+            if (tiers[i].maxStake == 0) {
+                break;
+            }
+            if (amount >= tiers[i].minStake && amount < tiers[i].maxStake) {
+                return tiers[i].baseAPR;
+            }
+            i++;
+        }
+        return 0;
+    }
+
+    /**
+     * @dev Uses and increments the nonce for the given owner.
+     * @param owner The address of the owner.
+     * @return The current nonce before incrementing.
+     */
+    function _useNonce(address owner) internal returns (uint256) {
+        // For each account, the nonce has an initial value of 0, can only be incremented by one, and cannot be
+        // decremented or reset. This guarantees that the nonce never overflows.
+        unchecked {
+            // It is important to do x++ and not ++x here.
+            return nonces[owner]++;
+        }
+    }
+
+    /**
+     * @dev Generates a unique hash for a stake request.
+     *
+     * This function creates a unique identifier for a stake request by hashing the user's address,
+     * the staking amount, and the current block timestamp. The hash can be used to uniquely identify
+     * a staking action, ensuring that each stake request is distinct.
+     *
+     * @param user The address of the user initiating the stake.
+     * @param amount The amount of tokens being staked.
+     *
+     * @return bytes32 A unique hash representing the stake request.
+     */
+    function _hashStakeRequest(address user, uint256 amount, uint256 nonce) internal view returns (bytes32) {
+        return keccak256(abi.encodePacked(user, amount, nonce, block.timestamp));
+    }
+
+    function _paid(address token, address to, uint256 amount) internal {
+        if (token == address(0)) {
+            payable(to).sendValue(amount);
+        } else {
+            IERC20Upgradeable(token).safeTransfer(to, amount);
+        }
     }
 }

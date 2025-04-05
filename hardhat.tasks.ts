@@ -11,8 +11,8 @@ extendEnvironment((hre: HardhatRuntimeEnvironment) => {
         const account = getConfiguredVar("PRIVATE_KEY"); // owner account
         hre.config.networks[hre.network.name].accounts = [account];
     }
-
     const apiKeyObj = hre.config.etherscan.apiKey;
+
     // @ts-expect-error - Network name is dynamically assigned
     if (!apiKeyObj[hre.network.name]) {
         const apiKey = getConfiguredVar("ETHERSCAN_KEY");
