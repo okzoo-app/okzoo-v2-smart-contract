@@ -32,14 +32,16 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
     IERC20Upgradeable public stakeToken; // ERC20 token used for staking
     IERC20Upgradeable public rewardToken; // ERC20 token used for rewards
     uint256 public totalStaked; // Total staked amount
+    uint256 public totalStaking;
 
     mapping(uint256 => Tier) public tiers; // Staking tiers
     mapping(uint256 => uint256) public lockPeriods; // Lock period bonuses
 
-    mapping(address => uint256) public stakedAmount; // Tracks user staked amounts
+    mapping(address => uint256) public stakingAmount; // Tracks user staked amounts
     mapping(bytes32 => StakeRequest) public stakeRequests; // Maps stake requests by ID
     mapping(address => EnumerableSetUpgradeable.Bytes32Set) private userStakeRequests; // Tracks stake request IDs for each user
-    mapping(address => StakeEvent[]) private userStakeEvents; // Tracks stake events for each user
+    mapping(address => Event[]) private userEvents; // Tracks stake events for each user
+
     // Use for emergency withdraw
     bool public isEmergencyWithdraw;
 
@@ -168,7 +170,6 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
             amount: amount,
             lockPeriod: lockPeriod,
             stakeTime: block.timestamp,
-            unLockTime: block.timestamp + lockPeriod * ONE_DAY,
             claimed: false
         });
 
@@ -179,12 +180,12 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         userStakeRequests[msg.sender].add(stakeRequestId);
 
         // Add the stake to the user's staking history (used for reward calculations)
-        userStakeEvents[msg.sender].push(StakeEvent(stakeRequest.stakeTime, stakeRequest.amount, true));
-        userStakeEvents[msg.sender].push(StakeEvent(stakeRequest.unLockTime, stakeRequest.amount, false));
+        userEvents[msg.sender].push(Event(stakeRequest.stakeTime, stakeRequest.amount, true));
 
         // Update the user's and the contract's total staked amount
-        stakedAmount[msg.sender] += amount;
+        stakingAmount[msg.sender] += amount;
         totalStaked += amount;
+        totalStaking += amount;
 
         // Emit an event to log the staking action
         emit Staked(msg.sender, stakeRequestId, amount, lockPeriod);
@@ -223,12 +224,12 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         }
 
         // Ensure the claim is being made after at least 1/4 of the lock period has passed
-        if (block.timestamp < (stakeRequest.stakeTime + (stakeRequest.unLockTime - stakeRequest.stakeTime) / 4)) {
+        if (block.timestamp < (stakeRequest.stakeTime + (stakeRequest.lockPeriod * ONE_DAY) / 4)) {
             revert NotClaimTime();
         }
 
-        stakedAmount[msg.sender] -= stakeRequest.amount;
-        totalStaked -= stakeRequest.amount;
+        stakingAmount[msg.sender] -= stakeRequest.amount;
+        totalStaking -= stakeRequest.amount;
 
         // Mark the stake request as claimed
         stakeRequests[stakeRequestId].claimed = true;
@@ -239,9 +240,11 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         // Transfer the claimed amount (principal + rewards) to the user
         stakeToken.safeTransfer(stakeRequest.owner, stakeRequest.amount);
 
+        userEvents[msg.sender].push(Event(block.timestamp, stakeRequest.amount, false));
+
         // If the full lock period has passed, calculate and add the staking rewards
         uint256 reward = 0;
-        if (block.timestamp >= stakeRequest.unLockTime) {
+        if (block.timestamp >= stakeRequest.stakeTime + stakeRequest.lockPeriod * ONE_DAY) {
             reward = _calculateReward(stakeRequest);
             rewardToken.safeTransfer(stakeRequest.owner, reward);
         }
@@ -265,14 +268,14 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         }
 
         // Withdraw staking amount
-        uint256 claimAmount = stakedAmount[msg.sender];
+        uint256 claimAmount = stakingAmount[msg.sender];
 
         if (claimAmount == 0) {
             revert InsufficientStakedAmount();
         }
 
-        stakedAmount[msg.sender] = 0;
-        totalStaked -= claimAmount;
+        stakingAmount[msg.sender] = 0;
+        totalStaking -= claimAmount;
 
         bytes32[] memory stakeRequestIds = getUserStakeRequests(msg.sender);
 
@@ -324,32 +327,9 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
      * @dev Returns a list of user stake ranges.
      * @param _user The user address
      */
-    function getUserStakeEvents(address _user) public view returns (StakeEvent[] memory) {
-        return userStakeEvents[_user];
+    function getUserEvents(address _user) public view returns (Event[] memory) {
+        return userEvents[_user];
     }
-
-    /**
-     * @dev Retrieves the total reward for a specific stake request identified by `stakeRequestId`.
-     *      It calculates the reward based on the stake request details such as the stake amount,
-     *      stake time, unlock time, and any other relevant parameters using the `_calculateReward` function.
-     *
-     * @param stakeRequestId The unique identifier for the stake request whose reward is to be calculated.
-     *
-     * @return uint256 The total reward calculated for the given stake request.
-     */
-    function getReward(bytes32 stakeRequestId) external view returns (uint256) {
-        // Retrieve the stake request details using the stakeRequestId
-        StakeRequest memory stakeRequest = stakeRequests[stakeRequestId];
-
-        // Calculate and return the reward based on the stake request details
-        return _calculateReward(stakeRequest);
-    }
-
-    // function getEvents(address user) external view returns (StakeEvent[] memory) {
-    //     StakeEvent[] memory events = userStakeEvents[user];
-
-    //     return _sortEvents(events);
-    // }
 
     /**************************|
     |         Internals        |
@@ -377,25 +357,28 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
      */
     function _calculateReward(StakeRequest memory claimRequest) internal view returns (uint256 totalReward) {
         // Retrieve staking history events for the user
-        StakeEvent[] memory events = userStakeEvents[claimRequest.owner];
+        Event[] memory events = userEvents[claimRequest.owner];
 
         // Sort stake events chronologically
-        events = _sortEvents(events);
+        // events = _sortEvents(events);
 
         uint256 currentAmount = 0; // Tracks the user's active staked amount
         uint256 prevTime = events[0].time; // Tracks the previous event time
 
-        // Iterate through sorted stake events
         for (uint256 i = 0; i < events.length; i++) {
             if (events[i].time != prevTime) {
                 // Only calculate rewards within the stake request period
-                if (prevTime >= claimRequest.stakeTime && events[i].time <= claimRequest.unLockTime) {
+                if (prevTime >= claimRequest.stakeTime) {
                     uint256 apr = _getAPR(currentAmount); // Get APR for the current stake amount
                     uint256 bonusPeriod = lockPeriods[claimRequest.lockPeriod]; // Get bonus APR for lock period
 
+                    uint256 endCalculateTime = i == events.length - 1
+                        ? claimRequest.stakeTime + claimRequest.lockPeriod * ONE_DAY
+                        : events[i].time;
+
                     // Reward calculation: (amount * (APR + bonus) * duration) / (100 * 365 * ONE_DAY)
                     totalReward +=
-                        (claimRequest.amount * (apr + bonusPeriod) * (events[i].time - prevTime)) /
+                        (claimRequest.amount * (apr + bonusPeriod) * (endCalculateTime - prevTime)) /
                         100 /
                         365 /
                         ONE_DAY;
@@ -404,7 +387,7 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
             }
 
             // Update the active staked amount based on event type
-            if (events[i].isStart) {
+            if (events[i].isStake) {
                 currentAmount += events[i].amount; // Increase stake amount
             } else {
                 currentAmount -= events[i].amount; // Decrease stake amount
@@ -412,34 +395,6 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         }
 
         return totalReward;
-    }
-
-    /**
-     * @dev Sorts an array of StakeEvent events based on the following criteria:
-     *      1. Sort by `time` in ascending order.
-     *      2. If two events have the same `time`, prioritize events where `isStart` is true over those where `isStart` is false.
-     *
-     * This is a bubble sort implementation, which iterates over the array multiple times and swaps elements to sort the events.
-     * The time complexity of this function is O(n^2) due to the nested loops.
-     *
-     * @param events The array of StakeEvent events to be sorted.
-     * @return The sorted array of StakeEvent events.
-     */
-    function _sortEvents(StakeEvent[] memory events) internal pure returns (StakeEvent[] memory) {
-        for (uint256 i = 0; i < events.length - 1; i++) {
-            for (uint256 j = 0; j < events.length - i - 1; j++) {
-                if (events[j].time > events[j + 1].time) {
-                    // Swap nếu thời gian của sự kiện j > sự kiện j+1
-                    (events[j], events[j + 1]) = (events[j + 1], events[j]);
-                } else if (events[j].time == events[j + 1].time) {
-                    // Nếu thời gian giống nhau, ưu tiên sự kiện có isStart == true
-                    if (!events[j].isStart && events[j + 1].isStart) {
-                        (events[j], events[j + 1]) = (events[j + 1], events[j]);
-                    }
-                }
-            }
-        }
-        return events;
     }
 
     /**
@@ -487,6 +442,10 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
      */
     function _hashStakeRequest(address user, uint256 amount, uint256 nonce) internal view returns (bytes32) {
         return keccak256(abi.encodePacked(user, amount, nonce, block.timestamp));
+    }
+
+    function _hashEventRequest(address user, uint256 amount, bool isStart) internal view returns (bytes32) {
+        return keccak256(abi.encodePacked(user, amount, isStart, block.timestamp));
     }
 
     function _paid(address token, address to, uint256 amount) internal {

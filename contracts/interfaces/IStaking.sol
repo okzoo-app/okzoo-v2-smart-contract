@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
+import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+
 interface IStaking {
     struct Tier {
         uint256 minStake;
@@ -19,10 +21,10 @@ interface IStaking {
     event EmergencyWithdrawn(address indexed user, uint256 amount);
     event SetIsEmergencyWithdraw(bool emergencyWithdraw);
 
-    struct StakeEvent {
+    struct Event {
         uint256 time;
         uint256 amount;
-        bool isStart;
+        bool isStake;
     }
 
     struct StakeRequest {
@@ -30,7 +32,6 @@ interface IStaking {
         uint256 amount;
         uint256 lockPeriod;
         uint256 stakeTime;
-        uint256 unLockTime;
         bool claimed;
     }
 
@@ -66,7 +67,5 @@ interface IStaking {
 
     function getUserStakeRequests(address _user) external view returns (bytes32[] memory);
 
-    function getUserStakeEvents(address _user) external view returns (StakeEvent[] memory);
-
-    function getReward(bytes32 stakeRequestId) external view returns (uint256);
+    function getUserEvents(address _user) external view returns (Event[] memory);
 }
