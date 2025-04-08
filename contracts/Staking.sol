@@ -32,11 +32,12 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
     IERC20Upgradeable public stakeToken; // ERC20 token used for staking
     IERC20Upgradeable public rewardToken; // ERC20 token used for rewards
     uint256 public totalStaked; // Total staked amount
+    uint256 public totalStaking;
 
     mapping(uint256 => Tier) public tiers; // Staking tiers
     mapping(uint256 => uint256) public lockPeriods; // Lock period bonuses
 
-    mapping(address => uint256) public stakedAmount; // Tracks user staked amounts
+    mapping(address => uint256) public stakingAmount; // Tracks user staked amounts
     mapping(bytes32 => StakeRequest) public stakeRequests; // Maps stake requests by ID
     mapping(address => EnumerableSetUpgradeable.Bytes32Set) private userStakeRequests; // Tracks stake request IDs for each user
     mapping(address => StakeEvent[]) private userStakeEvents; // Tracks stake events for each user
@@ -183,8 +184,9 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         userStakeEvents[msg.sender].push(StakeEvent(stakeRequest.unLockTime, stakeRequest.amount, false));
 
         // Update the user's and the contract's total staked amount
-        stakedAmount[msg.sender] += amount;
+        stakingAmount[msg.sender] += amount;
         totalStaked += amount;
+        totalStaking += amount;
 
         // Emit an event to log the staking action
         emit Staked(msg.sender, stakeRequestId, amount, lockPeriod);
@@ -227,8 +229,8 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
             revert NotClaimTime();
         }
 
-        stakedAmount[msg.sender] -= stakeRequest.amount;
-        totalStaked -= stakeRequest.amount;
+        stakingAmount[msg.sender] -= stakeRequest.amount;
+        totalStaking -= stakeRequest.amount;
 
         // Mark the stake request as claimed
         stakeRequests[stakeRequestId].claimed = true;
@@ -265,14 +267,14 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         }
 
         // Withdraw staking amount
-        uint256 claimAmount = stakedAmount[msg.sender];
+        uint256 claimAmount = stakingAmount[msg.sender];
 
         if (claimAmount == 0) {
             revert InsufficientStakedAmount();
         }
 
-        stakedAmount[msg.sender] = 0;
-        totalStaked -= claimAmount;
+        stakingAmount[msg.sender] = 0;
+        totalStaking -= claimAmount;
 
         bytes32[] memory stakeRequestIds = getUserStakeRequests(msg.sender);
 
