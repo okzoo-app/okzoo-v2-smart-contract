@@ -31,8 +31,7 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
 
     IERC20Upgradeable public stakeToken; // ERC20 token used for staking
     IERC20Upgradeable public rewardToken; // ERC20 token used for rewards
-    uint256 public totalStaked; // Total staked amount
-    uint256 public totalStaking;
+    uint256 public totalStaked; // Total staked amount (includes both active and pending stakes)
 
     mapping(uint256 => Tier) public tiers; // Staking tiers
     mapping(uint256 => uint256) public lockPeriods; // Lock period bonuses
@@ -185,7 +184,6 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         // Update the user's and the contract's total staked amount
         stakingAmount[msg.sender] += amount;
         totalStaked += amount;
-        totalStaking += amount;
 
         // Emit an event to log the staking action
         emit Staked(msg.sender, stakeRequestId, amount, lockPeriod);
@@ -229,7 +227,6 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         }
 
         stakingAmount[msg.sender] -= stakeRequest.amount;
-        totalStaking -= stakeRequest.amount;
 
         // Mark the stake request as claimed
         stakeRequests[stakeRequestId].claimed = true;
@@ -275,7 +272,6 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         }
 
         stakingAmount[msg.sender] = 0;
-        totalStaking -= claimAmount;
 
         bytes32[] memory stakeRequestIds = getUserStakeRequests(msg.sender);
 
@@ -364,6 +360,7 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
 
         uint256 currentAmount = 0; // Tracks the user's active staked amount
         uint256 prevTime = events[0].time; // Tracks the previous event time
+        uint256 maxCheckTime = claimRequest.stakeTime + claimRequest.lockPeriod * ONE_DAY; // Maximum time to check for rewards
 
         for (uint256 i = 0; i < events.length; i++) {
             if (events[i].time != prevTime) {
@@ -372,9 +369,10 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
                     uint256 apr = _getAPR(currentAmount); // Get APR for the current stake amount
                     uint256 bonusPeriod = lockPeriods[claimRequest.lockPeriod]; // Get bonus APR for lock period
 
-                    uint256 endCalculateTime = i == events.length - 1
-                        ? claimRequest.stakeTime + claimRequest.lockPeriod * ONE_DAY
-                        : events[i].time;
+                    uint256 endCalculateTime = events[i].time;
+                    if (events[i].time > maxCheckTime) {
+                        endCalculateTime = claimRequest.stakeTime + claimRequest.lockPeriod * ONE_DAY;
+                    }
 
                     // Reward calculation: (amount * (APR + bonus) * duration) / (100 * 365 * ONE_DAY)
                     totalReward +=
@@ -382,6 +380,9 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
                         100 /
                         365 /
                         ONE_DAY;
+                    if (events[i].time > maxCheckTime) {
+                        break;
+                    }
                 }
                 prevTime = events[i].time; // Update the previous event time
             }
