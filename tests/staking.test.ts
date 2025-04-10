@@ -17,7 +17,7 @@ describe("Staking Contract", function () {
     let owner: SignerWithAddress;
     let user1: SignerWithAddress;
     let user2: SignerWithAddress;
-    const ONE_DAY = 60n; // seconds in a day
+    const ONE_DAY = 86400n; // seconds in a day
     const mintAmount = parseUnits("1000000", 18);
 
     const minStakeAmount = parseUnits("10", 18);
@@ -38,7 +38,7 @@ describe("Staking Contract", function () {
 
         const startTime = (await time.latest()) - 10;
 
-        const endTime = startTime + 86400; // 1 day in seconds
+        const endTime = startTime + 86400 * 12 * 30; // 1 day in seconds
         const tiers = [
             {
                 minStake: parseUnits("10", 18).toString(),
@@ -173,7 +173,7 @@ describe("Staking Contract", function () {
         // });
 
         it("should revert if the staking is ended", async function () {
-            await time.increase(86400 * 2); // Fast forward time to after the end time
+            await time.increase(86400 * 12 * 30); // Fast forward time to after the end time
 
             const stake = staking.connect(user1).stake(parseUnits("100", 18), 30);
             await expect(stake).to.be.revertedWithCustomError(staking, "NotStakeTime");
@@ -356,7 +356,7 @@ describe("Staking Contract", function () {
             const rewardBalanceBefore = await rewardToken.balanceOf(user1.address);
             const rewardContractBalanceBefore = await rewardToken.balanceOf(stakingAddress);
 
-            await staking.connect(user1).stake(initialStakeAmount, lockPeriod); // Assume lock period is 30 days
+            await staking.connect(user1).stake(initialStakeAmount, lockPeriod);
 
             await staking.connect(user1).stake(parseUnits("500", 18), 7);
 
@@ -485,7 +485,7 @@ describe("Staking Contract", function () {
                 365n /
                 BigInt(ONE_DAY);
 
-            console.log({ reward0 });
+            // console.log({ reward0 });
             const rewardBalanceBefore0 = await rewardToken.balanceOf(user1.address);
             await staking.connect(user1).claim(stakeRequestIds0[1]); // 10000
             const rewardBalanceAfter0 = await rewardToken.balanceOf(user1.address);
@@ -498,13 +498,9 @@ describe("Staking Contract", function () {
             await staking.connect(user1).stake(parseUnits("4500", 18), 360);
 
             await time.increase(Number(ONE_DAY));
-            const now1 = await time.latest();
             const stakeRequestIds1 = await staking.getUserStakeRequests(user1.address);
-
-            const stakeRequest11 = await staking.stakeRequests(stakeRequestIds1[1]);
-
-            console.log({ stakeRequest11 });
-            // 85: 0, 1000: 1, 4500: 2
+            // const stakeRequest11 = await staking.stakeRequests(stakeRequestIds1[1]);
+            // console.log({ stakeRequest11 });
 
             const rewardBalanceBefore1 = await rewardToken.balanceOf(user1.address);
             await staking.connect(user1).claim(stakeRequestIds1[1]); // 1000
@@ -522,14 +518,13 @@ describe("Staking Contract", function () {
 
             await time.increase(2 * Number(ONE_DAY));
             const stakeRequestIds2 = await staking.getUserStakeRequests(user1.address);
-            const stakeRequest202 = await staking.stakeRequests(stakeRequestIds2[2]);
-            console.log("========");
-
-            console.log({ stakeRequest202 });
+            // const stakeRequest202 = await staking.stakeRequests(stakeRequestIds2[2]);
+            // console.log("========");
+            // console.log({ stakeRequest202 });
 
             const rewardBalanceBefore2 = await rewardToken.balanceOf(user1.address);
-            const reward2 = 364383561643835616437n;
-            console.log({ reward2 });
+            const reward2 = 364383561643835616438n;
+            // console.log({ reward2 });
             await staking.connect(user1).claim(stakeRequestIds2[2]); // 2500
             const rewardBalanceAfter2 = await rewardToken.balanceOf(user1.address);
             expect(rewardBalanceAfter2).to.be.equal(rewardBalanceBefore2 + reward2);
@@ -539,13 +534,13 @@ describe("Staking Contract", function () {
 
             await time.increase(1 * Number(ONE_DAY));
             const stakeRequestId3 = await staking.getUserStakeRequests(user1.address);
-            const stakeRequest33 = await staking.stakeRequests(stakeRequestId3[3]);
-            console.log("========");
-            console.log({ stakeRequest33 });
+            // const stakeRequest33 = await staking.stakeRequests(stakeRequestId3[3]);
+            // console.log("========");
+            // console.log({ stakeRequest33 });
 
             const rewardBalanceBefore3 = await rewardToken.balanceOf(user1.address);
             const reward3 = 0n;
-            console.log({ reward3 });
+            // console.log({ reward3 });
 
             await staking.connect(user1).claim(stakeRequestId3[3]); // 100
             const rewardBalanceAfter3 = await rewardToken.balanceOf(user1.address);
@@ -553,60 +548,58 @@ describe("Staking Contract", function () {
 
             await time.increase(24 * Number(ONE_DAY));
             const stakeRequestId4 = await staking.getUserStakeRequests(user1.address);
-            const stakeRequest40 = await staking.stakeRequests(stakeRequestId4[0]);
-            console.log({ stakeRequest40 });
+            // const stakeRequest40 = await staking.stakeRequests(stakeRequestId4[0]);
+            // console.log({ stakeRequest40 });
 
             const rewardBalanceBefore4 = await rewardToken.balanceOf(user1.address);
-            const reward4 = 76086255707762557073n;
-            console.log({ rewardBalanceBefore4, reward4 });
+            const reward4 = 76104097190512430231n;
+            // console.log({ rewardBalanceBefore4, reward4 });
 
             await staking.connect(user1).claim(stakeRequestId4[0]); // 85
             const rewardBalanceAfter4 = await rewardToken.balanceOf(user1.address);
-            console.log({ rewardBalanceAfter4 });
+            // console.log({ rewardBalanceAfter4 });
             expect(rewardBalanceAfter4).to.be.equal(rewardBalanceBefore4 + reward4);
 
             await time.increase(20 * Number(ONE_DAY));
             const stakeRequestId5 = await staking.getUserStakeRequests(user1.address);
-            console.log({ stakeRequestId5 });
-            const stakeRequest52 = await staking.stakeRequests(stakeRequestId5[2]);
-            console.log({ stakeRequest52 });
+            // console.log({ stakeRequestId5 });
+            // const stakeRequest52 = await staking.stakeRequests(stakeRequestId5[2]);
+            // console.log({ stakeRequest52 });
 
             const rewardBalanceBefore5 = await rewardToken.balanceOf(user1.address);
-            const reward5 = 436304337899543378994n;
-            console.log({ rewardBalanceBefore5, reward5 });
+            const reward5 = 436191858986555048196n;
+            // console.log({ rewardBalanceBefore5, reward5 });
 
             await staking.connect(user1).claim(stakeRequestId5[2]); // 2900
             const rewardBalanceAfter5 = await rewardToken.balanceOf(user1.address);
-            console.log({ rewardBalanceAfter5 });
+            // console.log({ rewardBalanceAfter5 });
             expect(rewardBalanceAfter5).to.be.equal(rewardBalanceBefore5 + reward5);
 
             await time.increase(285 * Number(ONE_DAY));
             const stakeRequestId6 = await staking.getUserStakeRequests(user1.address);
-            const stakeRequest60 = await staking.stakeRequests(stakeRequestId6[0]);
-            const stakeRequest61 = await staking.stakeRequests(stakeRequestId6[1]);
-            console.log({ stakeRequest60, stakeRequest61 });
+            // const stakeRequest60 = await staking.stakeRequests(stakeRequestId6[0]);
+            // const stakeRequest61 = await staking.stakeRequests(stakeRequestId6[1]);
+            // console.log({ stakeRequest60, stakeRequest61 });
 
             const rewardBalanceBefore6 = await rewardToken.balanceOf(user1.address);
-            const reward6 = 26389736301369863013694n;
-            console.log({ rewardBalanceBefore6, reward6 });
+            const reward6 = 26389726034531963470315n;
+            // console.log({ rewardBalanceBefore6, reward6 });
 
             await staking.connect(user1).claim(stakeRequestId6[1]); // 4500
             const rewardBalanceAfter6 = await rewardToken.balanceOf(user1.address);
-            console.log({ rewardBalanceAfter6 });
+            // console.log({ rewardBalanceAfter6 });
             expect(rewardBalanceAfter6).to.be.equal(rewardBalanceBefore6 + reward6);
-
-            // 4500 * (375 + 220) * 360 / 100 / 365
 
             const rewardBalanceBefore7 = await rewardToken.balanceOf(user1.address);
             const reward7 = 35958904109589041095n;
-            console.log({ rewardBalanceBefore7, reward7 });
+            // console.log({ rewardBalanceBefore7, reward7 });
 
             await staking.connect(user1).claim(stakeRequestId6[0]);
             const rewardBalanceAfter7 = await rewardToken.balanceOf(user1.address);
-            console.log({ rewardBalanceAfter7 });
+            // console.log({ rewardBalanceAfter7 });
             expect(rewardBalanceAfter7).to.be.equal(rewardBalanceBefore7 + reward7);
 
-            const totalReward = 28184661141552511415512n;
+            const totalReward = 28184556237284373414494n;
 
             const rewardBalanceAfterEnd = await rewardToken.balanceOf(user1.address);
             const rewardContractBalanceAfterEnd = await rewardToken.balanceOf(stakingAddress);

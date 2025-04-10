@@ -21,9 +21,8 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
 
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.Bytes32Set;
 
-    uint256 private constant ONE_DAY = 60; //TODO: change to 1 days
+    uint256 private constant ONE_DAY = 1 days;
 
-    // uint256 public constant MAXIMUM_STAKE_REQUESTS = 15;
     uint256 public startTime;
     uint256 public endTime;
     uint256 public maxCap; // Maximum staking cap
@@ -154,9 +153,6 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
             revert InvalidAmount();
         }
 
-        // TODO: need recheck lock period if lock period is not in the list
-        // if (lockPeriods[lockPeriod] == 0 && lockPeriod != 0) revert InvalidLockPeriod();
-
         // Transfer the staking tokens from the user to the contract
         stakeToken.safeTransferFrom(msg.sender, address(this), amount);
 
@@ -234,10 +230,10 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         // Remove the stake request from the user's list
         userStakeRequests[msg.sender].remove(stakeRequestId);
 
+        userEvents[msg.sender].push(Event(block.timestamp, stakeRequest.amount, false));
+
         // Transfer the claimed amount (principal + rewards) to the user
         stakeToken.safeTransfer(stakeRequest.owner, stakeRequest.amount);
-
-        userEvents[msg.sender].push(Event(block.timestamp, stakeRequest.amount, false));
 
         // If the full lock period has passed, calculate and add the staking rewards
         uint256 reward = 0;
@@ -318,7 +314,6 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
     function getUserStakeRequests(address _user) public view returns (bytes32[] memory) {
         return userStakeRequests[_user].values();
     }
-
     /**
      * @dev Returns a list of user stake ranges.
      * @param _user The user address
@@ -326,7 +321,6 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
     function getUserEvents(address _user) public view returns (Event[] memory) {
         return userEvents[_user];
     }
-
     /**************************|
     |         Internals        |
     |_________________________*/
@@ -355,12 +349,9 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         // Retrieve staking history events for the user
         Event[] memory events = userEvents[claimRequest.owner];
 
-        // Sort stake events chronologically
-        // events = _sortEvents(events);
-
         uint256 currentAmount = 0; // Tracks the user's active staked amount
         uint256 prevTime = events[0].time; // Tracks the previous event time
-        uint256 maxCheckTime = claimRequest.stakeTime + claimRequest.lockPeriod * ONE_DAY; // Maximum time to check for rewards
+        uint256 unlockTime = claimRequest.stakeTime + claimRequest.lockPeriod * ONE_DAY; // Maximum time to check for rewards
 
         for (uint256 i = 0; i < events.length; i++) {
             if (events[i].time != prevTime) {
@@ -370,17 +361,16 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
                     uint256 bonusPeriod = lockPeriods[claimRequest.lockPeriod]; // Get bonus APR for lock period
 
                     uint256 endCalculateTime = events[i].time;
-                    if (events[i].time > maxCheckTime) {
-                        endCalculateTime = claimRequest.stakeTime + claimRequest.lockPeriod * ONE_DAY;
+                    if (events[i].time > unlockTime) {
+                        endCalculateTime = unlockTime;
                     }
 
-                    // Reward calculation: (amount * (APR + bonus) * duration) / (100 * 365 * ONE_DAY)
                     totalReward +=
                         (claimRequest.amount * (apr + bonusPeriod) * (endCalculateTime - prevTime)) /
                         100 /
                         365 /
                         ONE_DAY;
-                    if (events[i].time > maxCheckTime) {
+                    if (events[i].time > unlockTime) {
                         break;
                     }
                 }
@@ -443,10 +433,6 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
      */
     function _hashStakeRequest(address user, uint256 amount, uint256 nonce) internal view returns (bytes32) {
         return keccak256(abi.encodePacked(user, amount, nonce, block.timestamp));
-    }
-
-    function _hashEventRequest(address user, uint256 amount, bool isStart) internal view returns (bytes32) {
-        return keccak256(abi.encodePacked(user, amount, isStart, block.timestamp));
     }
 
     function _paid(address token, address to, uint256 amount) internal {
