@@ -92,7 +92,6 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, OwnableUpgradeable, EIP712Upgradea
             // if user has never checked in before, set streak to 1 and stage to Protoform
             if (user.lastCheckinDate == 0) {
                 user.streak = 1;
-                user.stage = EvolutionStage.Protoform;
             } else {
                 // if user has checked in before, check if it is consecutive day
                 if (_getDayofTimestamp(user.lastCheckinDate) == currentDate - 1) {
