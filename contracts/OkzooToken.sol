@@ -4,7 +4,7 @@ pragma solidity ^0.8.17;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract ERC20Token is ERC20 {
+contract OkzooToken is ERC20 {
     constructor(
         string memory name_,
         string memory symbol_,
