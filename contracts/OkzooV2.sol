@@ -83,11 +83,6 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, OwnableUpgradeable, EIP712Upgradea
             revert AlreadyCheckin();
         }
 
-        // if user has pending bonus, must claim bonus before checkin
-        if (user.pendingBonus) {
-            revert MustClaimBonusBeforeCheckin();
-        }
-
         unchecked {
             // if user has never checked in before, set streak to 1 and stage to Protoform
             if (user.lastCheckinDate == 0) {
@@ -99,6 +94,7 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, OwnableUpgradeable, EIP712Upgradea
                 } else {
                     // if user has missed a day, reset streak to 1
                     user.streak = 1;
+                    user.pendingBonus = false; // reset pending bonus
                 }
             }
         }
