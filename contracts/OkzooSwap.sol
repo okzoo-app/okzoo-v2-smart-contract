@@ -113,9 +113,12 @@ contract OkzooSwap is
         uint256 _inputAmount,
         uint256 _outputAmount,
         uint256 _swapLockTime,
+        bytes32 _swapRequestId,
         uint256 _deadline,
         bytes memory _signature
-    ) public {
+    ) external nonReentrant whenNotPaused {
+        // TODO: swap amount
+
         // Verify the provided signature is valid for the swap request
         if (
             !verifySwap(
@@ -123,6 +126,7 @@ contract OkzooSwap is
                 _inputAmount,
                 _outputAmount,
                 _swapLockTime,
+                _swapRequestId,
                 _deadline,
                 _useNonce(msg.sender),
                 _signature
@@ -133,7 +137,7 @@ contract OkzooSwap is
         if (_deadline < block.timestamp) revert DeadlinePassed();
 
         // Generate a unique identifier for this swap request using the hashed parameters and nonce
-        bytes32 _swapRequestId = _hashSwapRequest(msg.sender, _inputAmount, _outputAmount, _useNonce(msg.sender));
+        // bytes32 _swapRequestId = _hashSwapRequest(msg.sender, _inputAmount, _outputAmount, _useNonce(msg.sender));
 
         // Calculate the time when the user can claim the output tokens (now + lock time)
         uint256 claimTime = block.timestamp + _swapLockTime;
@@ -172,7 +176,7 @@ contract OkzooSwap is
         if (userSwap.user == address(0)) revert UserDoesNotExist();
 
         // Ensure the caller is the original swap initiator
-        if (userSwap.user != msg.sender) revert InvalidSignature();
+        if (userSwap.user != msg.sender) revert InvalidUser();
 
         // Prevent double claiming
         if (userSwap.claimed) revert AlreadyClaimed();
@@ -245,6 +249,7 @@ contract OkzooSwap is
         uint256 _inputAmount,
         uint256 _outputAmount,
         uint256 _swapLockTime,
+        bytes32 _swapRequestId,
         uint256 _deadline,
         uint256 _nonce,
         bytes memory _signature
@@ -254,6 +259,7 @@ contract OkzooSwap is
             inputAmount: _inputAmount,
             outputAmount: _outputAmount,
             swapLockTime: _swapLockTime,
+            swapRequestId: _swapRequestId,
             deadline: _deadline,
             nonce: _nonce
         });
@@ -301,12 +307,13 @@ contract OkzooSwap is
             keccak256(
                 abi.encode(
                     keccak256(
-                        "SwapRequest(address user,uint256 inputAmount,uint256 outputAmount,uint256 swapLockTime,uint256 deadline,uint256 nonce)"
+                        "SwapRequest(address user,uint256 inputAmount,uint256 outputAmount,uint256 swapLockTime,bytes32 swapRequestId,uint256 deadline,uint256 nonce)"
                     ),
                     _swapRequest.user,
                     _swapRequest.inputAmount,
                     _swapRequest.outputAmount,
                     _swapRequest.swapLockTime,
+                    _swapRequest.swapRequestId,
                     _swapRequest.deadline,
                     _swapRequest.nonce
                 )

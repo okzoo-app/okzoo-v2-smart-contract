@@ -19,6 +19,7 @@ interface IOkzooSwap {
         uint256 inputAmount;
         uint256 outputAmount;
         uint256 swapLockTime;
+        bytes32 swapRequestId;
         uint256 deadline;
         uint256 nonce;
     }
@@ -45,6 +46,7 @@ interface IOkzooSwap {
         uint256 _inputAmount,
         uint256 _outputAmount,
         uint256 _swapLockTime,
+        bytes32 _swapRequestId,
         uint256 _deadline,
         bytes memory _signature
     ) external;
