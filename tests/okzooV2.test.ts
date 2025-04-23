@@ -220,7 +220,7 @@ describe("OkzooV2", function () {
                 verifier,
             );
 
-            await okzoo.connect(user).bonus(deadline, signature);
+            await okzoo.connect(user).streakMilestone(deadline, signature);
             expect(await okzoo.getPendingBonus(user.address)).to.equal(false);
         });
 
@@ -247,9 +247,9 @@ describe("OkzooV2", function () {
                 okzooAddress,
                 verifier,
             );
-            await expect(okzoo.connect(user).bonus(deadline2, signature2)).to.be.revertedWithCustomError(
+            await expect(okzoo.connect(user).streakMilestone(deadline2, signature2)).to.be.revertedWithCustomError(
                 okzoo,
-                "NoBonusAvailable",
+                "StreakMilestoneNotReached",
             );
         });
         it("Should revert if user does not exist", async function () {
@@ -264,9 +264,9 @@ describe("OkzooV2", function () {
                 verifier,
             );
 
-            await expect(okzoo.connect(user).bonus(deadline, signature)).to.be.revertedWithCustomError(
+            await expect(okzoo.connect(user).streakMilestone(deadline, signature)).to.be.revertedWithCustomError(
                 okzoo,
-                "UserDoesNotExist",
+                "StreakMilestoneNotReached",
             );
         });
     });

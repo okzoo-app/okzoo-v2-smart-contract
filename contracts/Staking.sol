@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity 0.8.28;
 
 import {AddressUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
@@ -22,6 +22,7 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.Bytes32Set;
 
     uint256 private constant ONE_DAY = 1 days;
+    uint256 public pausedAt;
 
     uint256 public startTime;
     uint256 public endTime;
@@ -31,9 +32,11 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
     IERC20Upgradeable public stakeToken; // ERC20 token used for staking
     IERC20Upgradeable public rewardToken; // ERC20 token used for rewards
     uint256 public totalStaked; // Total staked amount (includes both active and pending stakes)
+    uint256 public totalStaking; // Total staking amount
 
     mapping(uint256 => Tier) public tiers; // Staking tiers
     mapping(uint256 => uint256) public lockPeriods; // Lock period bonuses
+    uint256[] public lockPeriodKeys; // Array of lock period keys
 
     mapping(address => uint256) public stakingAmount; // Tracks user staked amounts
     mapping(bytes32 => StakeRequest) public stakeRequests; // Maps stake requests by ID
@@ -83,6 +86,7 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         }
         for (uint256 i = 0; i < _lockPeriods.length; i++) {
             lockPeriods[_lockPeriods[i].daysLocked] = _lockPeriods[i].aprBonus;
+            lockPeriodKeys.push(_lockPeriods[i].daysLocked);
         }
     }
 
@@ -103,11 +107,19 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
     |         Pausable         |
     |_________________________*/
 
+    modifier autoUnpause() {
+        if (paused() && block.timestamp >= pausedAt + 12 hours) {
+            _unpause();
+        }
+        _;
+    }
+
     /**
      * @dev Allows the contract owner to pause staking operations.
      */
     function pause() external onlyOwner {
         _pause();
+        pausedAt = block.timestamp;
     }
 
     /**
@@ -142,7 +154,7 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
      * - Increments the total staked amount.
      * - Emits a `Staked` event with details of the stake.
      */
-    function stake(uint256 amount, uint256 lockPeriod) external nonReentrant whenNotPaused {
+    function stake(uint256 amount, uint256 lockPeriod) external nonReentrant autoUnpause whenNotPaused {
         // Check if the current time is past the allowed staking period
         if (block.timestamp < startTime || endTime < block.timestamp) {
             revert NotStakeTime();
@@ -180,6 +192,7 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         // Update the user's and the contract's total staked amount
         stakingAmount[msg.sender] += amount;
         totalStaked += amount;
+        totalStaking += amount;
 
         // Emit an event to log the staking action
         emit Staked(msg.sender, stakeRequestId, amount, lockPeriod);
@@ -203,7 +216,7 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
      * - Marks the stake request as claimed.
      * - Emits a `Claimed` event with details of the claim.
      */
-    function claim(bytes32 stakeRequestId) external nonReentrant whenNotPaused {
+    function claim(bytes32 stakeRequestId) external nonReentrant autoUnpause whenNotPaused {
         // Retrieve the stake request
         StakeRequest memory stakeRequest = stakeRequests[stakeRequestId];
 
@@ -223,6 +236,7 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         }
 
         stakingAmount[msg.sender] -= stakeRequest.amount;
+        totalStaking -= stakeRequest.amount;
 
         // Mark the stake request as claimed
         stakeRequests[stakeRequestId].claimed = true;
@@ -247,6 +261,10 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
     }
 
     function withdraw(address token, address to, uint256 amount) external onlyOwner {
+        if (token == address(stakeToken) && amount > stakeToken.balanceOf(address(this)) - totalStaking) {
+            revert InsufficientWithdrawAmount();
+        }
+
         _paid(token, to, amount);
         emit Withdrawn(token, to, amount);
     }
@@ -268,6 +286,7 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         }
 
         stakingAmount[msg.sender] = 0;
+        totalStaking -= claimAmount;
 
         bytes32[] memory stakeRequestIds = getUserStakeRequests(msg.sender);
 
@@ -278,10 +297,6 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
             stakeRequests[unstakeRequestId].claimed = true;
 
             userStakeRequests[msg.sender].remove(unstakeRequestId);
-        }
-
-        if (claimAmount == 0) {
-            revert InsufficientStakedAmount();
         }
 
         stakeToken.safeTransfer(msg.sender, claimAmount);
@@ -301,10 +316,21 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
     }
 
     /**
-     * @dev Returns the bonus APR for a given lock period.
+     * @dev Function to get the most recent lock period where daysLocked is less than or equal to input value.
+     * @param daysLocked The daysLocked value provided as input.
+     * @return The lock period with the closest daysLocked value.
      */
-    function getBonusPeriod(uint256 daysLocked) external view returns (uint256) {
-        return lockPeriods[daysLocked];
+    function getAPRLockPeriod(uint256 daysLocked) external view returns (uint256) {
+        if (daysLocked < lockPeriodKeys[0]) {
+            return 0; // Return 0 if the input is less than the minimum lock period
+        }
+        // Loop through the array of lock periods to find the closest lock period
+        for (uint256 i; i < lockPeriodKeys.length; i++) {
+            if (lockPeriodKeys[i] > daysLocked) {
+                return lockPeriods[lockPeriodKeys[i - 1]];
+            }
+        }
+        return 0; // Return 0 if no suitable lock period is found
     }
 
     /**
@@ -321,6 +347,7 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
     function getUserEvents(address _user) public view returns (Event[] memory) {
         return userEvents[_user];
     }
+
     /**************************|
     |         Internals        |
     |_________________________*/

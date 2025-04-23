@@ -1,10 +1,8 @@
 import { expect } from "chai";
-import { ethers, network } from "hardhat";
-import { ERC20, OkzooV2, OkzooV2__factory, Staking } from "../typechain-types";
+import { ethers } from "hardhat";
+import { ERC20, Staking } from "../typechain-types";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
-import { EIP712Domain, EIP712TypeDefinition } from "../helpers/EIP712.type";
-import { signTypedData } from "../helpers/EIP712";
 import { parseUnits } from "ethers";
 
 describe("Staking Contract", function () {
@@ -29,7 +27,7 @@ describe("Staking Contract", function () {
     beforeEach(async function () {
         [owner, user1, user2] = await ethers.getSigners();
         // Deploy ERC20 token for staking and rewards
-        const ERC20Mock = await ethers.getContractFactory("ERC20Token");
+        const ERC20Mock = await ethers.getContractFactory("OkzooToken");
         stakeToken = await ERC20Mock.deploy("Stake Token", "STK", mintAmount, owner.address);
         rewardToken = await ERC20Mock.deploy("Reward Token", "RWT", mintAmount, owner.address);
 
@@ -268,7 +266,7 @@ describe("Staking Contract", function () {
             await staking.connect(user1).claim(stakeRequestIds[0]);
 
             const apr = await staking.getAPR(stakeRequest.amount);
-            const bonusPeriod = await staking.getBonusPeriod(stakeRequest.lockPeriod);
+            const bonusPeriod = await staking.getAPRLockPeriod(stakeRequest.lockPeriod);
 
             // TODO: Double check the reward calculation
             const reward =
@@ -412,7 +410,7 @@ describe("Staking Contract", function () {
             const apr1 = await staking.getAPR(stakeRequest0.amount + stakeRequest1.amount);
             const apr2 = await staking.getAPR(stakeRequest0.amount + stakeRequest1.amount + stakeRequest2.amount);
 
-            const bonusPeriod0 = await staking.getBonusPeriod(stakeRequest0.lockPeriod);
+            const bonusPeriod0 = await staking.getAPRLockPeriod(stakeRequest0.lockPeriod);
 
             const reward0 =
                 (stakeRequest0.amount * (apr0 + bonusPeriod0) * (stakeRequest1.stakeTime - stakeRequest0.stakeTime)) /
@@ -477,7 +475,7 @@ describe("Staking Contract", function () {
             ];
 
             const apr01 = await staking.getAPR(stakeRequest01.amount + stakeRequest02.amount);
-            const bonusPeriod01 = await staking.getBonusPeriod(stakeRequest02.lockPeriod);
+            const bonusPeriod01 = await staking.getAPRLockPeriod(stakeRequest02.lockPeriod);
 
             const reward0 =
                 (stakeRequest02.amount * (apr01 + bonusPeriod01) * (stakeRequest02.lockPeriod * ONE_DAY)) /
@@ -652,23 +650,26 @@ describe("Staking Contract", function () {
 
         it("should allow owner to withdraw tokens", async function () {
             await staking.connect(user1).stake(initialStakeAmount, lockPeriod);
+            await stakeToken.connect(owner).transfer(stakingAddress, parseUnits("2", 18));
 
-            const balanceBefore = await stakeToken.balanceOf(owner.address);
-            const contractBalanceBefore = await stakeToken.balanceOf(stakingAddress);
+            await expect(staking.connect(owner).withdraw(stakeAddress, owner.address, parseUnits("2", 18))).to.be.emit(
+                staking,
+                "Withdrawn",
+            );
+        });
 
-            await staking.connect(owner).withdraw(stakeAddress, owner.address, initialStakeAmount);
+        it("should revert if owner to withdraw tokens of user", async function () {
+            await staking.connect(user1).stake(initialStakeAmount, lockPeriod);
 
-            const balanceAfter = await stakeToken.balanceOf(owner.address);
-            const contractBalanceAfter = await stakeToken.balanceOf(stakingAddress);
-            expect(balanceAfter).to.be.equal(balanceBefore + initialStakeAmount);
-            expect(contractBalanceAfter).to.be.equal(contractBalanceBefore - initialStakeAmount);
+            const withdraw = staking.connect(owner).withdraw(stakeAddress, owner.address, initialStakeAmount);
+            await expect(withdraw).to.be.revertedWithCustomError(staking, "InsufficientWithdrawAmount");
         });
 
         it("should revert if the owner tries to withdraw more than the contract balance", async function () {
             await staking.connect(user1).stake(initialStakeAmount, lockPeriod);
 
             const withdraw = staking.connect(owner).withdraw(stakeAddress, owner.address, mintAmount);
-            await expect(withdraw).to.be.rejectedWith("ERC20: transfer amount exceeds balance");
+            await expect(withdraw).to.be.revertedWithCustomError(staking, "InsufficientWithdrawAmount");
         });
 
         it("should revert if a non-owner tries to withdraw tokens", async function () {

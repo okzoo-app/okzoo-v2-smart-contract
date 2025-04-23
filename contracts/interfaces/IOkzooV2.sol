@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity 0.8.28;
 
 interface IOkzooV2 {
     struct User {
@@ -32,12 +32,12 @@ interface IOkzooV2 {
 
     event VerifierChanged(address indexed newVerifier);
     event CheckedIn(address indexed user, uint256 streak, uint256 timestamp);
-    event BonusClaimed(address indexed user, uint256 lastCheckin, uint256 amount, uint256 timestamp);
+    event StreakMilestoneReached(address indexed user, uint256 lastCheckin, uint256 amount, uint256 timestamp);
     event Evolved(address indexed user, EvolutionStage newStage, uint256 timestamp);
 
     function checkIn(uint256 _deadline, bytes memory _signature) external;
 
-    function bonus(uint256 _deadline, bytes memory _signature) external;
+    function streakMilestone(uint256 _deadline, bytes memory _signature) external;
 
     function evolve(EvolutionStage _stage, uint256 _deadline, bytes memory _signature) external;
 

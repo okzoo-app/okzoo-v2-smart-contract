@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity 0.8.28;
 
 import {IOkzooV2Errors} from "./interfaces/errors/IOkzooV2Errors.sol";
 import {IOkzooV2} from "./interfaces/IOkzooV2.sol";
@@ -9,7 +9,7 @@ import {EIP712Upgradeable, ECDSAUpgradeable} from "@openzeppelin/contracts-upgra
 
 /**
  * @title OkzooV2
- * @dev This contract manages user check-ins, bonuses, and evolution stages using EIP-712 signatures for verification.
+ * @dev This contract manages user check-ins, streak-milestone-reached, and evolution stages using EIP-712 signatures for verification.
  */
 contract OkzooV2 is IOkzooV2, IOkzooV2Errors, OwnableUpgradeable, EIP712Upgradeable {
     uint256 private constant ONE_DAY = 1 days; // 1 days
@@ -37,13 +37,6 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, OwnableUpgradeable, EIP712Upgradea
         __EIP712_init(domainName, signatureVersion);
         transferOwnership(initialOwner);
         verifier = _verifier;
-    }
-
-    modifier onlyUser() {
-        if (users[msg.sender].lastCheckinDate == 0) {
-            revert UserDoesNotExist();
-        }
-        _;
     }
 
     /**
@@ -111,24 +104,35 @@ contract OkzooV2 is IOkzooV2, IOkzooV2Errors, OwnableUpgradeable, EIP712Upgradea
     }
 
     /**
-     * @dev Allows a user to claim their bonus if available.
-     * @param _deadline The deadline for claiming the bonus.
-     * @param _signature The signature for verification.
+     * @notice Called when a user wants to claim a streak milestone bonus.
+     * @dev This function checks if the user is eligible for the milestone reward
+     * based on their current check-in streak (e.g., every 7 days).
+     * Requirements:
+     * - Valid signature must be provided.
+     * - Deadline must not have passed.
+     * - User must have an ongoing streak and be due a pending bonus.
+     * - Streak must be a multiple of 7 (milestone).
+     *
+     * @param _deadline Timestamp by which the request must be processed.
+     * @param _signature Signed message proving the user's intent.
      */
-    function bonus(uint256 _deadline, bytes memory _signature) public onlyUser {
+
+    function streakMilestone(uint256 _deadline, bytes memory _signature) public {
         if (!verifyCheckIn(msg.sender, _deadline, _useNonce(msg.sender), _signature)) revert InvalidSignature();
 
         if (_deadline < block.timestamp) revert DeadlinePassed();
 
         User storage user = users[msg.sender];
 
-        if (user.lastCheckinDate == 0 || user.pendingBonus == false) {
-            revert NoBonusAvailable();
+        uint256 currentStreak = getStreak(msg.sender);
+
+        if (user.lastCheckinDate == 0 || user.pendingBonus == false || currentStreak == 0 || currentStreak % 7 != 0) {
+            revert StreakMilestoneNotReached();
         }
 
         user.pendingBonus = false; // reset pending bonus
 
-        emit BonusClaimed(msg.sender, user.lastCheckinDate, 1, block.timestamp);
+        emit StreakMilestoneReached(msg.sender, user.lastCheckinDate, 1, block.timestamp);
     }
 
     /**

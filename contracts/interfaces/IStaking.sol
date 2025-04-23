@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity 0.8.28;
 
 interface IStaking {
     struct Tier {
@@ -49,7 +49,7 @@ interface IStaking {
 
     function getAPR(uint256 amount) external view returns (uint256);
 
-    function getBonusPeriod(uint256 daysLocked) external view returns (uint256);
+    function getAPRLockPeriod(uint256 daysLocked) external view returns (uint256);
 
     function pause() external;
 
