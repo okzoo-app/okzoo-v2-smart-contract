@@ -54,6 +54,7 @@ contract OkzooSwap is
     mapping(address => User) public users;
 
     uint256 public totalClaimed; // Tracks user claimed amounts
+    uint256 public swapPendingAmount; // Tracks pending swap amounts
 
     mapping(bytes32 => UserSwap) public userSwaps; // Maps swap requests by ID
     mapping(address => EnumerableSetUpgradeable.Bytes32Set) private userSwapRequests; // Tracks swap request IDs for each user
@@ -97,6 +98,24 @@ contract OkzooSwap is
         emit VerifierChanged(_verifier);
     }
 
+    /**************************|
+    |         Pausable         |
+    |_________________________*/
+
+    /**
+     * @dev Allows the contract owner to pause staking operations.
+     */
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /**
+     * @dev Allows the contract owner to unpause staking operations.
+     */
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
     /**
      * @notice Creates a new token swap request with a specified lock time.
      * @param _inputAmount The amount of input tokens the user wants to swap.
@@ -117,8 +136,6 @@ contract OkzooSwap is
         uint256 _deadline,
         bytes memory _signature
     ) external nonReentrant whenNotPaused {
-        // TODO: swap amount
-
         // Verify the provided signature is valid for the swap request
         if (
             !verifySwap(
@@ -153,6 +170,9 @@ contract OkzooSwap is
 
         // Track this user's swap request ID
         userSwapRequests[msg.sender].add(_swapRequestId);
+
+        // Track the user's total pending swaps
+        swapPendingAmount += _outputAmount;
 
         // Emit an event to signal that a swap request has been successfully created
         emit Swapped(msg.sender, _inputAmount, _outputAmount, _swapRequestId, claimTime);
@@ -189,6 +209,7 @@ contract OkzooSwap is
 
         // Update global and user-specific claimed totals
         totalClaimed += userSwap.outputAmount;
+        swapPendingAmount -= userSwap.outputAmount;
         users[msg.sender].totalClaimed += userSwap.outputAmount;
 
         // Transfer the output tokens to the user
