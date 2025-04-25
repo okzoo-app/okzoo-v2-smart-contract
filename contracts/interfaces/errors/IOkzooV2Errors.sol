@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity 0.8.28;
 
 interface IOkzooV2Errors {
     error AlreadyCheckin();
-    error NoBonusAvailable();
-    error UserDoesNotExist();
+    error StreakMilestoneNotReached();
     error MustClaimBonusBeforeCheckin();
     error AlreadyAtHighestStage();
     error AlreadyEvolved();
