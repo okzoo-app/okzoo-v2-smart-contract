@@ -34,7 +34,7 @@ interface IOkzooSwap {
     event VerifierChanged(address indexed newVerifier);
     event Swapped(
         address indexed user,
-        uint256 inputAmout,
+        uint256 inputAmount,
         uint256 outputAmount,
         bytes32 swapRequestId,
         uint256 claimTime
