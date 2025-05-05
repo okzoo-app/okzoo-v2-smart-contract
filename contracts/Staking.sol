@@ -265,6 +265,10 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
             revert InsufficientWithdrawAmount();
         }
 
+        if (to == address(0)) {
+            revert ZeroAddress();
+        }
+
         _paid(token, to, amount);
         emit Withdrawn(token, to, amount);
     }
@@ -394,9 +398,7 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
 
                     totalReward +=
                         (claimRequest.amount * (apr + bonusPeriod) * (endCalculateTime - prevTime)) /
-                        100 /
-                        365 /
-                        ONE_DAY;
+                        (100 * 365 * ONE_DAY);
                     if (events[i].time > unlockTime) {
                         break;
                     }
