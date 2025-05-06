@@ -1,11 +1,14 @@
 import { parseUnits } from "ethers";
+import { dateToUnixTimestamp, requireEnv } from "../util";
 
 const config = {
-    owner: "0xe492BE5D1f9C0DA726C560Bc451835AfC5568313", // TODO: set owner
-    stakeToken: "0x5fCb38F6bB84E029c9Ed5a9dF297979b92B34970",
-    rewardToken: "0x5fCb38F6bB84E029c9Ed5a9dF297979b92B34970",
-    startTime: parseUnits("1744096889", 0).toString(),
-    endTime: parseUnits("1745824889", 0).toString(),
+    owner: requireEnv("OWNER_ADDRESS"),
+    stakeToken: requireEnv("MAIN_TOKEN_ADDRESS"),
+    rewardToken: requireEnv("MAIN_TOKEN_ADDRESS"),
+
+    startTime: dateToUnixTimestamp("2025-05-25 00:00:00 UTC").toString(),
+    endTime: dateToUnixTimestamp("2025-05-25 00:00:00 UTC").toString(),
+
     maxCap: parseUnits("100000", 18).toString(),
     minStakeAmount: parseUnits("10", 18).toString(),
     tiers: [

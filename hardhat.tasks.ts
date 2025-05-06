@@ -1,8 +1,9 @@
 import * as fs from "fs";
-import { extendEnvironment, task, vars } from "hardhat/config";
+import { extendEnvironment, task } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import path from "path";
 import { ContractInfo, ContractOperation } from "./scripts/contract-operation";
+import { getConfiguredVar } from "./scripts/util";
 
 // additional settings
 extendEnvironment((hre: HardhatRuntimeEnvironment) => {
@@ -97,16 +98,6 @@ task("deploy", "Deploy a normal contract")
         // Log upgrade details to contracts.json
         logContractAction({ ...deployedContract, action: taskName, networkName: hre.network.name });
     });
-
-// Helper: get value for a var, either from env or vars setting
-function getConfiguredVar(key: string) {
-    let account = process.env[key] || "";
-    if (!account) {
-        // try to get from var config if not found in env
-        account = vars.get(key, "");
-    }
-    return account;
-}
 
 // Helper: Log contract deployment/verification/upgrade details to contracts.json
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
