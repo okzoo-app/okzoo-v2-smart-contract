@@ -6,8 +6,8 @@ const config = {
     stakeToken: requireEnv("MAIN_TOKEN_ADDRESS"),
     rewardToken: requireEnv("MAIN_TOKEN_ADDRESS"),
 
-    startTime: dateToUnixTimestamp("2025-05-06 00:00:00 UTC").toString(),
-    endTime: dateToUnixTimestamp("2026-05-06 00:00:00 UTC").toString(),
+    startTime: dateToUnixTimestamp("2025-05-06 7:00:00 UTC").toString(),
+    endTime: dateToUnixTimestamp("2026-05-06 7:00:00 UTC").toString(),
 
     maxCap: parseUnits("30000000", 18).toString(),
     minStakeAmount: parseUnits("100", 18).toString(),
