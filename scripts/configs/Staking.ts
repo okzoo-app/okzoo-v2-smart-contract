@@ -9,7 +9,7 @@ const config = {
     startTime: dateToUnixTimestamp(requireEnv("STAKING_START_TIME")).toString(),
     endTime: dateToUnixTimestamp(requireEnv("STAKING_END_TIME")).toString(),
 
-    maxCap: parseUnits("30000000", 18).toString(),
+    maxCap: parseUnits("3650000", 18).toString(),
     minStakeAmount: parseUnits("100", 18).toString(),
     tiers: [
         {
