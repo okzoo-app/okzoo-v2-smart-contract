@@ -39,7 +39,7 @@ const config = {
         },
         {
             minStake: parseUnits("100000", 18).toString(),
-            maxStake: parseUnits("30000000", 18).toString(),
+            maxStake: parseUnits("3650000", 18).toString(),
             baseAPR: parseUnits("100", 0).toString(),
         },
     ],
