@@ -28,7 +28,7 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
     uint256 public endTime;
     uint256 public maxCap; // Maximum staking cap
     uint256 public minStakeAmount; // Minimum amount allowed to stake
-    uint256 public mintLockPeriod; // Mint lock period
+    uint256 public minLockPeriod; // Mint lock period
 
     IERC20Upgradeable public stakeToken; // ERC20 token used for staking
     IERC20Upgradeable public rewardToken; // ERC20 token used for rewards
@@ -89,7 +89,7 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
             lockPeriods[_lockPeriods[i].daysLocked] = _lockPeriods[i].aprBonus;
             lockPeriodKeys.push(_lockPeriods[i].daysLocked);
         }
-        mintLockPeriod = _lockPeriods[0].daysLocked;
+        minLockPeriod = _lockPeriods[0].daysLocked;
     }
 
     /**************************|
@@ -167,7 +167,7 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
             revert InvalidAmount();
         }
 
-        if (lockPeriod < mintLockPeriod) {
+        if (lockPeriod < minLockPeriod) {
             revert InvalidLockPeriod();
         }
 
