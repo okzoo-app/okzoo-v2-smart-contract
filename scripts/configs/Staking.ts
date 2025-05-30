@@ -9,7 +9,7 @@ const config = {
     startTime: dateToUnixTimestamp(requireEnv("STAKING_START_TIME")).toString(),
     endTime: dateToUnixTimestamp(requireEnv("STAKING_END_TIME")).toString(),
 
-    maxCap: parseUnits("3650000", 18).toString(),
+    maxCap: parseUnits("25000000", 18).toString(),
     minStakeAmount: parseUnits("100", 18).toString(),
     tiers: [
         {
@@ -39,13 +39,17 @@ const config = {
         },
         {
             minStake: parseUnits("100000", 18).toString(),
-            maxStake: parseUnits("3650000", 18).toString(),
+            maxStake: parseUnits("0", 18).toString(),
             baseAPR: parseUnits("100", 0).toString(),
         },
     ],
     lockPeriods: [
         {
-            daysLocked: parseUnits("30", 0).toString(),
+            daysLocked: parseUnits("7", 0).toString(),
+            aprBonus: parseUnits("0", 0).toString(),
+        },
+        {
+            daysLocked: parseUnits("28", 0).toString(),
             aprBonus: parseUnits("0", 0).toString(),
         },
     ],

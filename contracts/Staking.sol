@@ -80,9 +80,6 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         transferOwnership(_owner);
 
         for (uint256 i = 0; i < _tiers.length; i++) {
-            if (_tiers[i].maxStake == 0) {
-                revert InvalidTier();
-            }
             tiers[i] = _tiers[i];
         }
         for (uint256 i = 0; i < _lockPeriods.length; i++) {
@@ -95,6 +92,33 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
     /**************************|
     |          Setters         |
     |_________________________*/
+
+    /**
+     * @dev Set the general config
+     * @param _startTime The start time
+     * @param _endTime The end time
+     * @param _maxCap The max cap
+     * @param _minStakeAmount The min stake amount
+     */
+    function setGeneralConfig(
+        uint256 _startTime,
+        uint256 _endTime,
+        uint256 _maxCap,
+        uint256 _minStakeAmount
+    ) external onlyOwner whenPaused {
+        if (_startTime != 0) {
+            startTime = _startTime;
+        }
+        if (_endTime != 0) {
+            endTime = _endTime;
+        }
+        if (_maxCap != 0) {
+            maxCap = _maxCap;
+        }
+        if (_minStakeAmount != 0) {
+            minStakeAmount = _minStakeAmount;
+        }
+    }
 
     /**
      * @dev Set the emergency unstake
@@ -234,11 +258,6 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
         // Ensure the stake request has not been claimed already
         if (stakeRequest.claimed) {
             revert AlreadyClaimed();
-        }
-
-        // Ensure the claim is being made after at least 1/4 of the lock period has passed
-        if (block.timestamp < (stakeRequest.stakeTime + (stakeRequest.lockPeriod * ONE_DAY) / 4)) {
-            revert NotClaimTime();
         }
 
         stakingAmount[msg.sender] -= stakeRequest.amount;
@@ -429,11 +448,15 @@ contract Staking is IStaking, IStakingErrors, OwnableUpgradeable, PausableUpgrad
     function _getAPR(uint256 amount) internal view returns (uint256) {
         uint256 i = 0;
         while (true) {
+            bool overMin = amount >= tiers[i].minStake;
+            bool underMax = tiers[i].maxStake == 0 || amount < tiers[i].maxStake;
+
+            if (overMin && underMax) {
+                return tiers[i].baseAPR;
+            }
+
             if (tiers[i].maxStake == 0) {
                 break;
-            }
-            if (amount >= tiers[i].minStake && amount < tiers[i].maxStake) {
-                return tiers[i].baseAPR;
             }
             i++;
         }
