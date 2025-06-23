@@ -22,13 +22,16 @@ describe("StakingV2", () => {
         token = await Token.deploy("Stake", "STK", parseEther("100000"), owner.address);
         reward = await Token.deploy("Reward", "RWD", parseEther("100000"), owner.address);
 
+        const tokenAddress = await token.getAddress();
+        const rewardAddress = await reward.getAddress();
+
         const now = await time.latest();
         const start = now + 10;
         const end = start + 30 * 24 * 60 * 60; // 30 days
         startTime = start;
         endTime = end;
 
-        const maxStakePerUser = 100n;
+        const maxStakePerUser = 100;
 
         const Staking = await ethers.getContractFactory("StakingV2");
         staking = await Staking.deploy();
@@ -36,8 +39,8 @@ describe("StakingV2", () => {
 
         await staking.initialize(
             owner.address,
-            token.address,
-            reward.address,
+            tokenAddress,
+            rewardAddress,
             totalReward,
             startTime,
             endTime,
@@ -75,8 +78,8 @@ describe("StakingV2", () => {
         await time.increase(204600);
         await staking.connect(user).unstake(0);
 
-        // const rewardBalance = await reward.balanceOf(user.address);
-        // console.log({ rewardBalance: formatEther(rewardBalance) });
+        const rewardBalance = await reward.balanceOf(user.address);
+        console.log({ rewardBalance: formatEther(rewardBalance) });
 
         await time.increase(86460);
         await staking.connect(user).unstake(1);
@@ -111,8 +114,8 @@ describe("StakingV2", () => {
         await time.increase(1382280);
         await staking.connect(user).unstake(4);
 
-        // const rewardBalance2 = await reward.balanceOf(user.address);
-        // console.log({ rewardBalance2: formatEther(rewardBalance2) });
+        const rewardBalance2 = await reward.balanceOf(user.address);
+        console.log({ rewardBalance2: formatEther(rewardBalance2) });
 
         await time.increase(86400);
         await staking.connect(user).unstake(5);
