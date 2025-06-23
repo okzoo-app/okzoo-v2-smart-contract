@@ -74,6 +74,7 @@ contract StakingV2 is
 
     /**
      * @notice Initialize the contract with required parameters.
+     * @param _owner Address of the contract owner.
      * @param _stakedToken Address of the token to be staked.
      * @param _rewardToken Address of the token used for rewards.
      * @param _totalReward Total amount of reward tokens available for distribution.
@@ -85,6 +86,7 @@ contract StakingV2 is
      * @dev This function can only be called once during contract deployment.
      */
     function initialize(
+        address _owner,
         address _stakedToken,
         address _rewardToken,
         uint256 _totalReward,
@@ -99,6 +101,8 @@ contract StakingV2 is
         __Ownable_init();
         __Pausable_init();
         __ReentrancyGuard_init();
+
+        transferOwnership(_owner);
 
         stakedToken = IERC20Upgradeable(_stakedToken);
         rewardToken = IERC20Upgradeable(_rewardToken);

@@ -18,6 +18,7 @@ interface IStakingV2 {
     event SetIsEmergencyWithdraw(bool emergencyWithdraw);
 
     function initialize(
+        address _owner,
         address _stakedToken,
         address _rewardToken,
         uint256 _totalReward,

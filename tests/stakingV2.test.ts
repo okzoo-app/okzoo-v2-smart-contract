@@ -3,7 +3,7 @@ import { ethers } from "hardhat";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { formatEther, parseEther } from "ethers";
 
-describe("DynamicAPRStaking", () => {
+describe("StakingV2", () => {
     let staking: any, token: any, reward: any;
     let stakingAddress: string;
 
@@ -28,18 +28,24 @@ describe("DynamicAPRStaking", () => {
         startTime = start;
         endTime = end;
 
-        const Staking = await ethers.getContractFactory("DynamicAPRStaking");
-        staking = await Staking.deploy(
-            await token.getAddress(),
-            await reward.getAddress(),
+        const maxStakePerUser = 100n;
+
+        const Staking = await ethers.getContractFactory("StakingV2");
+        staking = await Staking.deploy();
+        stakingAddress = await staking.getAddress();
+
+        await staking.initialize(
+            owner.address,
+            token.address,
+            reward.address,
             totalReward,
-            start,
-            end,
+            startTime,
+            endTime,
             lockDuration,
             maxStake,
+            maxStakePerUser,
         );
 
-        stakingAddress = await staking.getAddress();
         // Fund staking contract
         await reward.transfer(stakingAddress, totalReward);
         await token.transfer(user.address, parseEther("100000"));
