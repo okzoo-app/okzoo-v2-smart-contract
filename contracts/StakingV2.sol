@@ -207,7 +207,15 @@ contract StakingV2 is
 
         totalStaked += amount;
 
-        emit Staked(msg.sender, amount, userStakes[msg.sender].length - 1);
+        emit Staked(
+            msg.sender,
+            amount,
+            userStakes[msg.sender].length - 1,
+            block.timestamp,
+            unlockTime,
+            rewardDebt,
+            accRewardPerToken
+        );
     }
 
     /**
@@ -240,7 +248,7 @@ contract StakingV2 is
         }
 
         stakedToken.safeTransfer(msg.sender, stakeInfo.amount);
-        emit Unstaked(msg.sender, stakeInfo.amount, reward, stakeId);
+        emit Unstaked(msg.sender, stakeInfo.amount, reward, stakeId, accRewardPerToken);
     }
 
     /**

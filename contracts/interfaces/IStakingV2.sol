@@ -10,8 +10,16 @@ interface IStakingV2 {
         bool claimed;
     }
 
-    event Staked(address indexed user, uint256 amount, uint256 stakeId);
-    event Unstaked(address indexed user, uint256 amount, uint256 reward, uint256 stakeId);
+    event Staked(
+        address indexed user,
+        uint256 amount,
+        uint256 stakeId,
+        uint256 stakeTime,
+        uint256 unlockTime,
+        uint256 rewardDebt,
+        uint256 accRewardPerToken
+    );
+    event Unstaked(address indexed user, uint256 amount, uint256 reward, uint256 stakeId, uint256 accRewardPerToken);
     event Withdrawn(address indexed token, address indexed to, uint256 amount);
 
     event EmergencyWithdrawn(address indexed user, uint256 amount);
