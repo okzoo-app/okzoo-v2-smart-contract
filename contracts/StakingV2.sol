@@ -85,6 +85,7 @@ contract StakingV2 is
      * @param _endTime End time of the staking campaign (in seconds since epoch).
      * @param _lockDuration Duration for which staked tokens are locked (in seconds).
      * @param _maxActiveStake Maximum total amount of tokens that can be staked at any time.
+     * @param _minStakeAmount Minimum amount of tokens required to stake.
      * @param _maxStakePerUser Maximum number of stakes allowed per user.
      * @dev This function can only be called once during contract deployment.
      */
