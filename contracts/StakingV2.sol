@@ -48,6 +48,9 @@ contract StakingV2 is
     // Maximum total staked amount allowed
     uint256 public maxActiveStake;
 
+    // Minimum stake amount required to participate
+    uint256 public minStakeAmount;
+
     // Maximum number of stakes allowed per user
     uint256 public maxStakePerUser;
 
@@ -94,6 +97,7 @@ contract StakingV2 is
         uint256 _endTime,
         uint256 _lockDuration,
         uint256 _maxActiveStake,
+        uint256 _minStakeAmount,
         uint256 _maxStakePerUser
     ) public initializer {
         if (_startTime >= _endTime) revert InvalidTime();
@@ -111,6 +115,7 @@ contract StakingV2 is
         endTime = _endTime;
         lockDuration = _lockDuration;
         maxActiveStake = _maxActiveStake;
+        minStakeAmount = _minStakeAmount;
         maxStakePerUser = _maxStakePerUser;
 
         rewardPerSecond = _totalReward / (_endTime - _startTime);
@@ -189,6 +194,7 @@ contract StakingV2 is
         if (userStakes[msg.sender].length >= maxStakePerUser) revert TooManyStakes();
         if (block.timestamp < startTime || block.timestamp > endTime) revert NotInStakingPeriod();
         if (totalStaked + amount > maxActiveStake) revert MaxStakeReached();
+        if (amount < minStakeAmount) revert InvalidAmount();
 
         stakedToken.safeTransferFrom(msg.sender, address(this), amount);
 

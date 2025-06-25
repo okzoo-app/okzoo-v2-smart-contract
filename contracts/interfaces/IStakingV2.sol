@@ -34,6 +34,7 @@ interface IStakingV2 {
         uint256 _endTime,
         uint256 _lockDuration,
         uint256 _maxActiveStake,
+        uint256 _minStakeAmount,
         uint256 _maxStakePerUser
     ) external;
 

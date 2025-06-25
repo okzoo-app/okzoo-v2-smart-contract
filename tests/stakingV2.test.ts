@@ -11,6 +11,7 @@ describe("StakingV2", () => {
     const totalReward = parseEther("5000");
     const lockDuration = 15 * 24 * 60 * 60; // 15 days
     const maxStake = parseEther("100000");
+    const minStake = parseEther("1"); // Minimum stake amount
 
     let startTime: number;
     let endTime: number;
@@ -46,6 +47,7 @@ describe("StakingV2", () => {
             endTime,
             lockDuration,
             maxStake,
+            minStake,
             maxStakePerUser,
         );
 
@@ -200,47 +202,87 @@ describe("StakingV2", () => {
         expect(rewardBalanceEnd2).to.be.gt(0); // Ensure some reward was earned
     });
 
-    // it("should allow staking and track user stake", async () => {
-    //     await time.increaseTo(await staking.startTime());
-    //     await token.connect(user).approve(stakingAddress, parseEther("100"));
-    //     await staking.connect(user).stake(parseEther("50"));
+    it("should allow staking and track user stake", async () => {
+        await time.increaseTo(await staking.startTime());
+        await token.connect(user).approve(stakingAddress, parseEther("100"));
+        await staking.connect(user).stake(parseEther("50"));
 
-    //     const stakes = await staking.getUserStakes(user.address);
-    //     console.log({ stakes });
-    //     expect(stakes[0].amount).to.equal(parseEther("50"));
-    // });
+        const stakes = await staking.getUserStakes(user.address);
+        console.log({ stakes });
+        expect(stakes[0].amount).to.equal(parseEther("50"));
+    });
 
-    // it("should give correct reward after unlock", async () => {
-    //     const rewardBalanceBefore = await reward.balanceOf(user.address);
-    //     console.log({ rewardBalanceBefore: formatEther(rewardBalanceBefore) });
-    //     await time.increaseTo(await staking.startTime());
-    //     await token.connect(user).approve(stakingAddress, parseEther("10000"));
-    //     await staking.connect(user).stake(parseEther("10000"));
+    it("should give correct reward after unlock", async () => {
+        // const rewardBalanceBefore = await reward.balanceOf(user.address);
+        // console.log({ rewardBalanceBefore: formatEther(rewardBalanceBefore) });
+        await time.increaseTo(await staking.startTime());
+        await token.connect(user).approve(stakingAddress, parseEther("10000"));
+        await staking.connect(user).stake(parseEther("10000"));
 
-    //     // Wait for > lock duration
-    //     await time.increase(lockDuration + 1);
-    //     await staking.connect(user).unstake(0);
+        // Wait for > lock duration
+        await time.increase(lockDuration);
+        await staking.connect(user).unstake(0);
 
-    //     const rewardBalance = await reward.balanceOf(user.address);
-    //     console.log({ rewardBalance: formatEther(rewardBalance) });
-    //     expect(rewardBalance).to.be.gt(0); // reward received
-    // });
+        const rewardBalance = await reward.balanceOf(user.address);
+        console.log({ rewardBalance: formatEther(rewardBalance) });
+        expect(rewardBalance).to.be.gt(0); // reward received
+    });
 
-    // it("should not give reward before unlock time", async () => {
-    //     await time.increaseTo(await staking.startTime());
-    //     await token.connect(user).approve(stakingAddress, parseEther("100"));
-    //     await staking.connect(user).stake(parseEther("50"));
+    it("should not give reward before unlock time", async () => {
+        await time.increaseTo(await staking.startTime());
+        await token.connect(user).approve(stakingAddress, parseEther("100"));
+        await staking.connect(user).stake(parseEther("50"));
 
-    //     await time.increase(lockDuration / 2); // Not fully unlocked
-    //     await staking.connect(user).unstake(0);
+        await time.increase(lockDuration / 2); // Not fully unlocked
+        await staking.connect(user).unstake(0);
 
-    //     const rewardBalance = await reward.balanceOf(user.address);
-    //     expect(rewardBalance).to.equal(0); // No reward yet
-    // });
+        const rewardBalance = await reward.balanceOf(user.address);
+        expect(rewardBalance).to.equal(0); // No reward yet
+    });
 
-    // it("should reject stake beyond maxActiveStake", async () => {
-    //     await time.increaseTo(await staking.startTime());
-    //     await token.connect(user).approve(stakingAddress, maxStake + 1n);
-    //     await expect(staking.connect(user).stake(maxStake + 1n)).to.be.revertedWith("Max stake reached");
-    // });
+    it("should reject stake beyond maxActiveStake", async () => {
+        await time.increaseTo(await staking.startTime());
+        await token.connect(user).approve(stakingAddress, maxStake + 1n);
+        await expect(staking.connect(user).stake(maxStake + 1n)).to.be.revertedWithCustomError(
+            staking,
+            "MaxStakeReached",
+        );
+    });
+
+    it("should revert staking before start time", async () => {
+        const stakeAmount = parseEther("10");
+        await token.connect(user).approve(stakingAddress, stakeAmount);
+        await expect(staking.connect(user).stake(stakeAmount)).to.be.revertedWithCustomError(
+            staking,
+            "NotInStakingPeriod",
+        );
+    });
+
+    it("should prevent double unstake", async () => {
+        await time.increaseTo(await staking.startTime());
+
+        const stakeAmount = parseEther("10");
+        await token.connect(user).approve(stakingAddress, stakeAmount);
+        await staking.connect(user).stake(stakeAmount);
+
+        await time.increase(lockDuration + 1);
+
+        await staking.connect(user).unstake(0);
+        await expect(staking.connect(user).unstake(0)).to.be.revertedWithCustomError(staking, "AlreadyClaimed");
+    });
+
+    it("should allow emergency withdraw when enabled", async () => {
+        await time.increaseTo(await staking.startTime());
+
+        const stakeAmount = parseEther("10");
+        await token.connect(user).approve(stakingAddress, stakeAmount);
+        await staking.connect(user).stake(stakeAmount);
+
+        await staking.pause();
+        await staking.setIsEmergencyWithdraw(true);
+        await staking.connect(user).emergencyWithdraw();
+
+        const userStakes = await staking.getUserStakes(user.address);
+        expect(userStakes[0].claimed).to.be.true;
+    });
 });
