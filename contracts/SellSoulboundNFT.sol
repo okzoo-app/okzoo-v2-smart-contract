@@ -25,30 +25,49 @@ contract SellSoulboundNFT is
 {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
-    SoulboundNFT public nft;
+    uint256 public pausedAt;
 
+    SoulboundNFT public nft;
     IERC20Upgradeable public paymentToken;
 
-    bytes32 public whitelistMerkleRoot;
-
     WhitelistConfig public whitelistConfig;
-
     PublicConfig public publicConfig;
 
-    // Batch info
-
     uint256 public currentBatchId;
-    uint256 public totalMinted;
     mapping(uint256 => Batch) public batches;
+    uint256 public totalMinted;
 
-    function initialize(address _nft, address _initialOwner, bytes32 _whitelistMerkleRoot) public initializer {
+    function initialize(address _nft, address _initialOwner) public initializer {
         __AccessControl_init();
         __Pausable_init();
         __ReentrancyGuard_init();
         __Ownable_init();
         _transferOwnership(_initialOwner);
         nft = SoulboundNFT(_nft);
-        whitelistMerkleRoot = _whitelistMerkleRoot;
+    }
+
+    function pause() external onlyOwner {
+        pausedAt = block.timestamp;
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    modifier autoUnpause() {
+        if (paused() && block.timestamp >= pausedAt + 12 hours) {
+            _unpause();
+        }
+        _;
+    }
+
+    function setWhitelistConfig(WhitelistConfig calldata _whitelistConfig) external onlyOwner {
+        whitelistConfig = _whitelistConfig;
+    }
+
+    function setPublicConfig(PublicConfig calldata _publicConfig) external onlyOwner {
+        publicConfig = _publicConfig;
     }
 
     // --- Batch config ---
@@ -116,6 +135,6 @@ contract SellSoulboundNFT is
 
     function verifyWhitelistProof(address account, bytes32[] calldata proof) public view returns (bool) {
         bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(account))));
-        return MerkleProofUpgradeable.verifyCalldata(proof, whitelistMerkleRoot, leaf);
+        return MerkleProofUpgradeable.verifyCalldata(proof, whitelistConfig.whitelistMerkleRoot, leaf);
     }
 }

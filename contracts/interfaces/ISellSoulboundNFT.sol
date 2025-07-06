@@ -7,6 +7,7 @@ interface ISellSoulboundNFT {
         uint256 endTime;
         uint256 price;
         uint256 maxMint;
+        bytes32 whitelistMerkleRoot;
     }
 
     struct PublicConfig {
