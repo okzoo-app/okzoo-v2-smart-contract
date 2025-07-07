@@ -37,13 +37,14 @@ contract SellSoulboundNFT is
     mapping(uint256 => Batch) public batches;
     uint256 public totalMinted;
 
-    function initialize(address _nft, address _initialOwner) public initializer {
+    function initialize(address _nft, address _initialOwner, address _paymentToken) public initializer {
         __AccessControl_init();
         __Pausable_init();
         __ReentrancyGuard_init();
         __Ownable_init();
         _transferOwnership(_initialOwner);
         nft = SoulboundNFT(_nft);
+        paymentToken = IERC20Upgradeable(_paymentToken);
     }
 
     function pause() external onlyOwner {
@@ -90,7 +91,7 @@ contract SellSoulboundNFT is
         );
         require(paymentAmount >= whitelistConfig.price, ISellSoulboundNFTErrors.InsufficientPayment());
 
-        _buy(to, true);
+        _buy(to, paymentAmount, true);
     }
 
     function buyPublic(address to, uint256 paymentAmount) external nonReentrant whenNotPaused {
@@ -99,11 +100,11 @@ contract SellSoulboundNFT is
             ISellSoulboundNFTErrors.InvalidPublicConfig()
         );
         require(paymentAmount >= publicConfig.price, ISellSoulboundNFTErrors.InsufficientPayment());
-        _buy(to, false);
+        _buy(to, paymentAmount, false);
     }
 
     /// @notice Buy NFT (minted with custom URI)
-    function _buy(address to, bool isWhitelist) internal {
+    function _buy(address to, uint256 paymentAmount, bool isWhitelist) internal {
         Batch storage batch = batches[currentBatchId];
         uint256 newTokenId = batch.startId + batch.minted;
 
@@ -111,6 +112,8 @@ contract SellSoulboundNFT is
         if (isWhitelist) {
             require(batch.minted < whitelistConfig.maxMint, ISellSoulboundNFTErrors.InvalidMinted());
         }
+
+        paymentToken.safeTransferFrom(msg.sender, address(this), paymentAmount);
 
         string memory uri = string(abi.encodePacked(batch.baseURI, "/", Strings.toString(newTokenId), ".json"));
 
