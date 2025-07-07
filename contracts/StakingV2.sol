@@ -72,6 +72,9 @@ contract StakingV2 is
     // Mapping of user address to list of their stakes
     mapping(address => StakeInfo[]) public userStakes;
 
+    // Mapping of user address to their total staking amount
+    mapping(address => uint256) public stakingAmount;
+
     // Use for emergency withdraw
     bool public isEmergencyWithdraw;
 
@@ -213,6 +216,7 @@ contract StakingV2 is
         );
 
         totalStaked += amount;
+        stakingAmount[msg.sender] += amount;
 
         emit Staked(
             msg.sender,
@@ -245,6 +249,7 @@ contract StakingV2 is
 
         stakeInfo.claimed = true;
         totalStaked -= stakeInfo.amount;
+        stakingAmount[msg.sender] -= stakeInfo.amount;
 
         uint256 reward = 0;
 
@@ -281,6 +286,7 @@ contract StakingV2 is
             revert InsufficientStakedAmount();
         }
         totalStaked -= stakedAmount;
+        stakingAmount[msg.sender] -= stakedAmount;
         stakedToken.safeTransfer(msg.sender, stakedAmount);
 
         emit EmergencyWithdrawn(msg.sender, stakedAmount);
