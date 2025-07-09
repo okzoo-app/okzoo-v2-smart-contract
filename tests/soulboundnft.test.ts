@@ -70,40 +70,34 @@ describe("SellSoulboundNFT", function () {
 
     it("should allow whitelist mint", async () => {
         const proof = merkleTree.getProof(0);
-        const mint = await contract.connect(user1).buyWithWhitelist(user1.address, proof, ethers.parseEther("10"));
+        const mint = await contract.connect(user1).buyWithWhitelist(proof, ethers.parseEther("10"));
         await expect(mint).to.emit(contract, "NFTSold");
     });
 
     it("should reject invalid proof", async () => {
         const proof = merkleTree.getProof(0);
         await expect(
-            contract.connect(user2).buyWithWhitelist(user2.address, proof, ethers.parseEther("10")),
+            contract.connect(user2).buyWithWhitelist(proof, ethers.parseEther("10")),
         ).to.be.revertedWithCustomError(contract, "InvalidProof");
     });
 
     it("should allow public mint", async () => {
-        await expect(contract.connect(user1).buyPublic(user1.address, ethers.parseEther("15"))).to.emit(
-            contract,
-            "NFTSold",
-        );
+        await expect(contract.connect(user1).buyPublic(ethers.parseEther("15"))).to.emit(contract, "NFTSold");
     });
 
     it("should pause and unpause correctly", async () => {
         await contract.connect(owner).pause();
-        await expect(contract.connect(user1).buyPublic(user1.address, ethers.parseEther("15"))).to.be.reverted;
+        await expect(contract.connect(user1).buyPublic(ethers.parseEther("15"))).to.be.reverted;
 
         await contract.connect(owner).unpause();
-        await expect(contract.connect(user1).buyPublic(user1.address, ethers.parseEther("15"))).to.emit(
-            contract,
-            "NFTSold",
-        );
+        await expect(contract.connect(user1).buyPublic(ethers.parseEther("15"))).to.emit(contract, "NFTSold");
     });
 
     it("should allow withdraw", async () => {
         await contract.connect(owner).withdraw(owner.address, 0); // No fund yet
 
         const proof = merkleTree.getProof(0);
-        await contract.connect(user1).buyWithWhitelist(user1.address, proof, ethers.parseEther("10"));
+        await contract.connect(user1).buyWithWhitelist(proof, ethers.parseEther("10"));
 
         const prevBal = await paymentToken.balanceOf(owner.address);
         await contract.connect(owner).withdraw(owner.address, ethers.parseEther("10"));

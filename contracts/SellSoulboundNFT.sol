@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.27;
+pragma solidity 0.8.28;
 
 import {SoulboundNFT} from "./SoulboundNFT.sol";
 import {MerkleProofUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/MerkleProofUpgradeable.sol";
@@ -120,6 +120,7 @@ contract SellSoulboundNFT is
      */
     function setWhitelistConfig(WhitelistConfig calldata _whitelistConfig) external onlyOwner {
         whitelistConfig = _whitelistConfig;
+        emit WhitelistConfigSet(_whitelistConfig);
     }
 
     /**
@@ -129,6 +130,7 @@ contract SellSoulboundNFT is
      */
     function setPublicConfig(PublicConfig calldata _publicConfig) external onlyOwner {
         publicConfig = _publicConfig;
+        emit PublicConfigSet(_publicConfig);
     }
 
     /**
@@ -143,20 +145,17 @@ contract SellSoulboundNFT is
 
         currentBatchId++;
         batches[currentBatchId] = Batch(startId, endId, baseURI, 0);
+
+        emit BatchCreated(currentBatchId, startId, endId, baseURI);
     }
 
     /**
      * @notice Buy NFT with whitelist proof
      * @dev Only owner can create a new batch.
-     * @param to The address of the buyer.
      * @param proof The proof of the whitelist.
      * @param paymentAmount The amount of payment.
      */
-    function buyWithWhitelist(
-        address to,
-        bytes32[] calldata proof,
-        uint256 paymentAmount
-    ) external nonReentrant whenNotPaused {
+    function buyWithWhitelist(bytes32[] calldata proof, uint256 paymentAmount) external nonReentrant whenNotPaused {
         require(verifyWhitelistProof(msg.sender, proof), ISellSoulboundNFTErrors.InvalidProof());
         require(
             block.timestamp >= whitelistConfig.startTime && block.timestamp <= whitelistConfig.endTime,
@@ -164,22 +163,21 @@ contract SellSoulboundNFT is
         );
         require(paymentAmount >= whitelistConfig.price, ISellSoulboundNFTErrors.InsufficientPayment());
 
-        _buy(to, paymentAmount, true);
+        _buy(msg.sender, paymentAmount, true);
     }
 
     /**
      * @notice Buy NFT with public proof
      * @dev Only owner can create a new batch.
-     * @param to The address of the buyer.
      * @param paymentAmount The amount of payment.
      */
-    function buyPublic(address to, uint256 paymentAmount) external nonReentrant whenNotPaused {
+    function buyPublic(uint256 paymentAmount) external nonReentrant whenNotPaused {
         require(
             block.timestamp >= publicConfig.startTime && block.timestamp <= publicConfig.endTime,
             ISellSoulboundNFTErrors.InvalidPublicConfig()
         );
         require(paymentAmount >= publicConfig.price, ISellSoulboundNFTErrors.InsufficientPayment());
-        _buy(to, paymentAmount, false);
+        _buy(msg.sender, paymentAmount, false);
     }
 
     /**

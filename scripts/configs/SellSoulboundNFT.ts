@@ -8,3 +8,11 @@ const config = {
 export default config;
 
 // https://okzoo-plus-assets.s3.ap-southeast-1.amazonaws.com/public/test
+/**
+ * 1. SoulboundNFT: 0x11C26AC8e9195C48F09521DC384ad019Aa0244cb
+ *      - yarn hardhat write --contract SoulboundNFT --address 0x11C26AC8e9195C48F09521DC384ad019Aa0244cb --method setMinter --args '["0xAAa2b6a59D80DC4025433CE2C3A36d1Fd497E31D"]' --network bscTestnet
+ * 2. SellSoulboundNFT: 0xAAa2b6a59D80DC4025433CE2C3A36d1Fd497E31D
+ *      - yarn hardhat write --contract SellSoulboundNFT --address 0xAAa2b6a59D80DC4025433CE2C3A36d1Fd497E31D --method createBatch --args '[0,10,"https://okzoo-plus-assets.s3.ap-southeast-1.amazonaws.com/public/test"]' --network bscTestnet
+ *      - yarn hardhat write --contract SellSoulboundNFT --address 0xAAa2b6a59D80DC4025433CE2C3A36d1Fd497E31D --method setPublicConfig --args '[{"startTime":"1752059868","endTime":"1754738268","price":"10000000000000000000"}]' --network bscTestnet
+ *      - yarn hardhat write --contract SellSoulboundNFT --address 0xAAa2b6a59D80DC4025433CE2C3A36d1Fd497E31D --method setWhitelistConfig --args '[{"startTime":"1752059868","endTime":"1754738268","price":"10000000000000000000","maxMint":50,"whitelistMerkleRoot":"0x0000000000000000000000000000000000000000000000000000000000000000"}]' --network bscTestnet
+ */
