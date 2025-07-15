@@ -24,17 +24,14 @@ interface IConverterToken {
         address _verifier,
         address _token,
         address _nft,
+        uint256 _convertCooldown,
         string memory _domainName,
         string memory _signatureVersion
     ) external;
 
-    function convert(
-        uint256 amountIn,
-        uint256 amountOut,
-        uint256 deadline,
-        uint256 nonce,
-        bytes memory signature
-    ) external;
+    function convert(uint256 amountIn, uint256 amountOut, uint256 deadline, bytes memory signature) external;
+
+    function nonces(address owner) external view returns (uint256);
 
     function getUserConvertHistory(address user) external view returns (Conversion[] memory);
 }

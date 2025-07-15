@@ -7,4 +7,5 @@ interface IConverterTokenErrors {
     error InvalidSignature();
     error DeadlinePassed();
     error InsufficientBalance();
+    error CooldownNotOver();
 }
