@@ -10,6 +10,7 @@ const config = {
     endTime: dateToUnixTimestamp(requireEnv("STAKING_END_TIME")).toString(),
     lockDuration: 15 * 24 * 60 * 60, // 15 days in seconds
     maxStake: parseUnits("100000", 18).toString(),
+    minStakeAmount: parseUnits("1", 18).toString(),
     maxStakePerUser: 100, // 100 stakes per user
 };
 
