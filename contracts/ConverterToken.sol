@@ -140,6 +140,17 @@ contract ConverterToken is
         emit Withdraw(_token, to, amount);
     }
 
+    /**
+     * @notice Updates the verifier address.
+     * @dev Only owner can update the verifier address.
+     * @param newVerifier The new verifier address.
+     */
+    function updateVerifier(address newVerifier) external onlyOwner {
+        require(newVerifier != address(0), IConverterTokenErrors.InvalidVerifier());
+        verifier = newVerifier;
+        emit VerifierUpdated(verifier, newVerifier);
+    }
+
     // ====== Main Logic ======
 
     /**

@@ -8,4 +8,5 @@ interface IConverterTokenErrors {
     error DeadlinePassed();
     error InsufficientBalance();
     error CooldownNotOver();
+    error InvalidVerifier();
 }
