@@ -70,6 +70,9 @@ contract SellSoulboundNFT is
     // Total minted
     uint256 public totalMinted;
 
+    // Minted
+    mapping(address => Minted) public minted;
+
     /**
      * @dev Initializes the contract.
      * @param _nft The address of the SoulboundNFT contract.
@@ -205,10 +208,13 @@ contract SellSoulboundNFT is
         // Mint NFT to buyer
         uint256 tokenId = nft.safeMint(to, uri);
 
+        // Update minted
+        minted[to] = Minted(currentBatchId, tokenId, msg.sender, paymentAmount, block.timestamp);
+
         // Update batch minted and total minted
         batch.minted++;
         totalMinted++;
-        emit NFTSold(to, tokenId);
+        emit NFTSold(to, tokenId, currentBatchId);
     }
 
     /**

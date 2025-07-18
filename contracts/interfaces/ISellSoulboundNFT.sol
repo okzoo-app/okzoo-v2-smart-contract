@@ -23,10 +23,18 @@ interface ISellSoulboundNFT {
         uint256 minted;
     }
 
+    struct Minted {
+        uint256 batchId;
+        uint256 tokenId;
+        address buyer;
+        uint256 paymentAmount;
+        uint256 timestamp;
+    }
+
     event WhitelistConfigSet(WhitelistConfig config);
     event PublicConfigSet(PublicConfig config);
     event BatchCreated(uint256 indexed batchId, uint256 startId, uint256 endId, string baseURI);
-    event NFTSold(address indexed buyer, uint256 indexed tokenId);
+    event NFTSold(address indexed buyer, uint256 indexed tokenId, uint256 indexed batchId);
     event Withdraw(address indexed to, uint256 amount);
 
     function buyWithWhitelist(bytes32[] calldata proof, uint256 paymentAmount) external;
