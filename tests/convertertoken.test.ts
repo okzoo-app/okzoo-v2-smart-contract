@@ -57,6 +57,7 @@ describe("ConverterToken", function () {
         userAddr: string,
         amountIn: string,
         amountOut: string,
+        convertId: number,
         deadline: number,
         nonce: number,
     ) => {
@@ -65,6 +66,7 @@ describe("ConverterToken", function () {
                 { name: "user", type: "address" },
                 { name: "amountIn", type: "uint256" },
                 { name: "amountOut", type: "uint256" },
+                { name: "convertId", type: "uint256" },
                 { name: "deadline", type: "uint256" },
                 { name: "nonce", type: "uint256" },
             ],
@@ -74,6 +76,7 @@ describe("ConverterToken", function () {
             user: userAddr,
             amountIn,
             amountOut,
+            convertId,
             deadline,
             nonce,
         };
@@ -86,19 +89,21 @@ describe("ConverterToken", function () {
         const amountOut = ethers.parseEther("20");
         const deadline = (await time.latest()) + 3600;
         const nonce = await converter.nonces(user.address);
+        const convertId = 1;
 
         const signature = await signConvertRequest(
             verifier,
             user.address,
             amountIn.toString(),
             amountOut.toString(),
+            convertId,
             deadline,
             nonce,
         );
 
-        await expect(converter.connect(user).convert(amountIn, amountOut, deadline, signature))
+        await expect(converter.connect(user).convert(amountIn, amountOut, convertId, deadline, signature))
             .to.emit(converter, "Converted")
-            .withArgs(user.address, amountIn, amountOut, (await time.latest()) + 1); // +1 to avoid timestamp collision
+            .withArgs(user.address, amountIn, amountOut, convertId, (await time.latest()) + 1); // +1 to avoid timestamp collision
 
         expect(await token.balanceOf(user.address)).to.equal(amountOut);
     });
@@ -108,18 +113,20 @@ describe("ConverterToken", function () {
         const amountIn = ethers.parseEther("5");
         const amountOut = ethers.parseEther("10");
         const deadline = (await time.latest()) + 3600;
+        const convertId = 1;
 
         const signature = await signConvertRequest(
             verifier,
             otherAddr,
             amountIn.toString(),
             amountOut.toString(),
+            convertId,
             deadline,
             0,
         );
 
         await expect(
-            converter.connect(other).convert(amountIn, amountOut, deadline, signature),
+            converter.connect(other).convert(amountIn, amountOut, convertId, deadline, signature),
         ).to.be.revertedWithCustomError(converter, "NotNftHolder");
     });
 
@@ -128,6 +135,7 @@ describe("ConverterToken", function () {
         const amountIn = ethers.parseEther("10");
         const amountOut = ethers.parseEther("20");
         const deadline = (await time.latest()) + 3600;
+        const convertId = 1;
 
         // wrong signer
         const invalidSignature = await signConvertRequest(
@@ -135,12 +143,13 @@ describe("ConverterToken", function () {
             userAddr,
             amountIn.toString(),
             amountOut.toString(),
+            convertId,
             deadline,
             0,
         );
 
         await expect(
-            converter.connect(user).convert(amountIn, amountOut, deadline, invalidSignature),
+            converter.connect(user).convert(amountIn, amountOut, convertId, deadline, invalidSignature),
         ).to.be.revertedWithCustomError(converter, "InvalidSignature");
     });
 
@@ -149,18 +158,20 @@ describe("ConverterToken", function () {
         const amountIn = ethers.parseEther("10");
         const amountOut = ethers.parseEther("20");
         const deadline = (await time.latest()) - 10;
+        const convertId = 1;
 
         const signature = await signConvertRequest(
             verifier,
             userAddr,
             amountIn.toString(),
             amountOut.toString(),
+            convertId,
             deadline,
             0,
         );
 
         await expect(
-            converter.connect(user).convert(amountIn, amountOut, deadline, signature),
+            converter.connect(user).convert(amountIn, amountOut, convertId, deadline, signature),
         ).to.be.revertedWithCustomError(converter, "DeadlinePassed");
     });
 
@@ -169,29 +180,34 @@ describe("ConverterToken", function () {
         const amountIn = ethers.parseEther("1");
         const amountOut = ethers.parseEther("2");
         const deadline = (await time.latest()) + 3600;
+        const convertId = 1;
 
         const signature1 = await signConvertRequest(
             verifier,
             userAddr,
             amountIn.toString(),
             amountOut.toString(),
+            convertId,
             deadline,
             0,
         );
 
-        await converter.connect(user).convert(amountIn, amountOut, deadline, signature1);
+        await converter.connect(user).convert(amountIn, amountOut, convertId, deadline, signature1);
+
+        const convertId2 = 2;
 
         const signature2 = await signConvertRequest(
             verifier,
             userAddr,
             amountIn.toString(),
             amountOut.toString(),
+            convertId2,
             deadline,
             1,
         );
 
         await expect(
-            converter.connect(user).convert(amountIn, amountOut, deadline, signature2),
+            converter.connect(user).convert(amountIn, amountOut, convertId2, deadline, signature2),
         ).to.be.revertedWithCustomError(converter, "CooldownNotOver");
     });
 

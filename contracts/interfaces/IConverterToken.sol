@@ -6,6 +6,7 @@ interface IConverterToken {
         address user;
         uint256 amountIn;
         uint256 amountOut;
+        uint256 convertId;
         uint256 deadline;
         uint256 nonce;
     }
@@ -16,7 +17,7 @@ interface IConverterToken {
         uint256 timestamp;
     }
 
-    event Converted(address indexed user, uint256 amountIn, uint256 amountOut, uint256 timestamp);
+    event Converted(address indexed user, uint256 amountIn, uint256 amountOut, uint256 convertId, uint256 timestamp);
     event Withdraw(address indexed token, address indexed to, uint256 amount);
     event VerifierUpdated(address indexed oldVerifier, address indexed newVerifier);
 
@@ -34,7 +35,13 @@ interface IConverterToken {
 
     function updateVerifier(address newVerifier) external;
 
-    function convert(uint256 amountIn, uint256 amountOut, uint256 deadline, bytes memory signature) external;
+    function convert(
+        uint256 amountIn,
+        uint256 amountOut,
+        uint256 convertId,
+        uint256 deadline,
+        bytes memory signature
+    ) external;
 
     function nonces(address owner) external view returns (uint256);
 

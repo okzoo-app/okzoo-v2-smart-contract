@@ -163,6 +163,7 @@ contract ConverterToken is
     function convert(
         uint256 amountIn,
         uint256 amountOut,
+        uint256 convertId,
         uint256 deadline,
         bytes memory signature
     ) external onlySBHolder autoUnpause nonReentrant whenNotPaused {
@@ -174,7 +175,15 @@ contract ConverterToken is
         require(amountOut > 0, IConverterTokenErrors.InvalidAmount());
 
         require(
-            verifyConvertRequest(msg.sender, amountIn, amountOut, deadline, _useNonce(msg.sender), signature),
+            verifyConvertRequest(
+                msg.sender,
+                amountIn,
+                amountOut,
+                convertId,
+                deadline,
+                _useNonce(msg.sender),
+                signature
+            ),
             IConverterTokenErrors.InvalidSignature()
         );
 
@@ -193,7 +202,7 @@ contract ConverterToken is
         totalConvertedOutAmount += amountOut;
         lastConvertAt[msg.sender] = block.timestamp;
 
-        emit Converted(msg.sender, amountIn, amountOut, block.timestamp);
+        emit Converted(msg.sender, amountIn, amountOut, convertId, block.timestamp);
     }
 
     /**
@@ -235,6 +244,7 @@ contract ConverterToken is
         address _user,
         uint256 _amountIn,
         uint256 _amountOut,
+        uint256 _convertId,
         uint256 _deadline,
         uint256 _nonce,
         bytes memory _signature
@@ -243,6 +253,7 @@ contract ConverterToken is
             user: _user,
             amountIn: _amountIn,
             amountOut: _amountOut,
+            convertId: _convertId,
             deadline: _deadline,
             nonce: _nonce
         });
@@ -265,11 +276,12 @@ contract ConverterToken is
             keccak256(
                 abi.encode(
                     keccak256(
-                        "ConvertRequest(address user,uint256 amountIn,uint256 amountOut,uint256 deadline,uint256 nonce)"
+                        "ConvertRequest(address user,uint256 amountIn,uint256 amountOut,uint256 convertId,uint256 deadline,uint256 nonce)"
                     ),
                     _convertRequest.user,
                     _convertRequest.amountIn,
                     _convertRequest.amountOut,
+                    _convertRequest.convertId,
                     _convertRequest.deadline,
                     _convertRequest.nonce
                 )
