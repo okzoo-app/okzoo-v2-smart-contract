@@ -1,9 +1,9 @@
 // Field order must be same with argument order in contract initializer function
 const config = {
-    name: "OKZOO",
-    symbol: "AIOT",
+    name: "ERC20 TOKEN",
+    symbol: "ERC20",
     mintAmount: 1_000_000_000,
-    recipient: "0x781A5e70d71A1a223995FbCcfF810d57b9Ef1098",
+    recipient: "0xe492BE5D1f9C0DA726C560Bc451835AfC5568313",
 };
 
 export default config;
