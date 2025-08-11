@@ -1,0 +1,71 @@
+{
+    "tokenAddress": "0xbC89769Bb1E4BD614CD3F72D5c5ec282b4cd88Bf",
+    "transfers": [
+        {
+            "to": "0x6c231a991e2f802ad5ba715a89d3b4fa20f50781",
+            "amount": "10000000"
+        },
+        {
+            "to": "0x2Dadb91AAa9e5e762f47e67bD8c75B14fF8061D4",
+            "amount": "10000000"
+        },
+        {
+            "to": "0xD3E70Ba6F42B97cCd97b7c3A8fBE990437095075",
+            "amount": "10000000"
+        },
+        {
+            "to": "0x267476E270991dD87bF7c1FA04B764F39F992f92",
+            "amount": "10000000"
+        },
+        {
+            "to": "0xeC552cFb5Ad7d7f8FB6aA5D832487Fcf1C2f04EB",
+            "amount": "10000000"
+        },
+        {
+            "to": "0x85Dd3163a09Ad85A66793E0578A9e2a6a7F6DC3F",
+            "amount": "10000000"
+        },
+        {
+            "to": "0x6935af443F349F506a439C034f95f8219C339bAF",
+            "amount": "10000000"
+        },
+        {
+            "to": "0x598A87D4603Fda89F26F55bbBDf776D8c207b02B",
+            "amount": "10000000"
+        },
+        {
+            "to": "0x7B6396d8CE9597C681d6Dec62c70dC84ccef6DC3",
+            "amount": "10000000"
+        },
+        {
+            "to": "0x340F77aF2E86c9ce09C388857B7CE40562DCc032",
+            "amount": "10000000"
+        },
+        {
+            "to": "0xbd4627c2d37e9569a0f01304e6bead255f0b64a5",
+            "amount": "10000000"
+        },
+        {
+            "to": "0x893959bA5BDbcbbf5f2405F43727F797605386CA",
+            "amount": "10000000"
+        },
+        {
+            "to": "0xe3ea2d078C256C7079893faf6f06238FDF6B28bE",
+            "amount": "10000000"
+        },
+        {
+            "to": "0x24369e49F30843CCa65Ce47ca4488e8E4E4E8CC3",
+            "amount": "10000000"
+        },
+        {
+            "to": "0xafc25bdef4647bf7ce44d87e3b1f0e2adaffd33f",
+            "amount": "10000000"
+        },
+        {
+            "to": "0xb6ae40cd355f1d389ad8dcfaac9b508c46407071",
+            "amount": "10000000"
+        }
+    ],
+    "gasLimit": 100000,
+    "gasPrice": "0.00000002"
+}
