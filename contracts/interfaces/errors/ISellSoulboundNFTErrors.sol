@@ -12,4 +12,5 @@ interface ISellSoulboundNFTErrors {
     error InvalidBatch();
     error InvalidMinted();
     error InvalidPayment();
+    error InvalidPaymentToken();
 }

@@ -11,25 +11,44 @@ import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 contract SoulboundNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Burnable, Ownable {
     uint256 private _nextTokenId = 1;
-    address public minter;
+    mapping(address => bool) public minters;
     mapping(address => bool) public hasMinted;
+
+    // --- Events ---
+    event MinterAdded(address indexed minter);
+    event MinterRemoved(address indexed minter);
 
     constructor(
         string memory name,
         string memory symbol,
-        address _minter,
+        address[] memory _minters,
         address initialOwner
     ) ERC721(name, symbol) Ownable(initialOwner) {
-        minter = _minter;
+        for (uint256 i = 0; i < _minters.length; i++) {
+            minters[_minters[i]] = true;
+            emit MinterAdded(_minters[i]);
+        }
     }
 
     modifier onlyMinter() {
-        require(msg.sender == minter, "Only minter can call this function");
+        require(minters[msg.sender], "Soulbound: not a minter");
         _;
     }
 
-    function setMinter(address _minter) external onlyOwner {
-        minter = _minter;
+    // --- Minter Management ---
+    function addMinter(address _minter) external onlyOwner {
+        require(_minter != address(0), "Invalid address");
+        require(!minters[_minter], "Already a minter");
+
+        minters[_minter] = true;
+        emit MinterAdded(_minter);
+    }
+
+    function removeMinter(address _minter) external onlyOwner {
+        require(minters[_minter], "Not a minter");
+
+        minters[_minter] = false;
+        emit MinterRemoved(_minter);
     }
 
     function safeMint(address to, string memory uri) public onlyMinter returns (uint256) {
@@ -52,8 +71,7 @@ contract SoulboundNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Burna
     ) internal override(ERC721, ERC721Enumerable) returns (address) {
         require(_ownerOf(tokenId) == address(0), "Soulbound: token is non-transferable");
         require(to != address(0), "Soulbound: to is zero address");
-        require(auth == address(0), "Soulbound: auth is not zero address"); // Block all transfers except minting (from == address(0))
-        require(msg.sender == minter, "Soulbound: only minter can call this function");
+        require(minters[msg.sender], "Soulbound: only minter can mint");
         return super._update(to, tokenId, auth);
     }
 
