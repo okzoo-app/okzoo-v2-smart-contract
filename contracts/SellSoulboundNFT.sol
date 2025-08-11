@@ -194,11 +194,13 @@ contract SellSoulboundNFT is
      */
     function buy(
         address token,
+        uint256 paymentAmount,
         bytes32[] calldata proof, // whitelist proof
         bool isWhitelist
     ) external payable nonReentrant autoUnpause whenNotPaused {
         uint256 price = paymentTokenPrice[token];
         require(price > 0, ISellSoulboundNFTErrors.InvalidPaymentToken());
+        require(paymentAmount >= price, ISellSoulboundNFTErrors.InsufficientPayment());
 
         // If whitelist, verify whitelist proof and check whitelist config
         if (isWhitelist) {
@@ -218,10 +220,10 @@ contract SellSoulboundNFT is
         // Payment
         if (token == address(0)) {
             // ETH payment
-            require(msg.value >= price, ISellSoulboundNFTErrors.InsufficientPayment());
+            require(msg.value >= paymentAmount, ISellSoulboundNFTErrors.InsufficientPayment());
         } else {
             // ERC20 payment
-            IERC20Upgradeable(token).safeTransferFrom(msg.sender, address(this), price);
+            IERC20Upgradeable(token).safeTransferFrom(msg.sender, address(this), paymentAmount);
         }
 
         // Mint NFT

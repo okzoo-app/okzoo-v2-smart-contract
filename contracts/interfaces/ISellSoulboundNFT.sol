@@ -52,6 +52,6 @@ interface ISellSoulboundNFT {
     function setWhitelistConfig(WhitelistConfig calldata config) external;
     function setPublicConfig(PublicConfig calldata config) external;
     function createBatch(uint256 startId, uint256 endId, string calldata baseURI) external;
-    function buy(address token, bytes32[] calldata proof, bool isWhitelist) external payable;
+    function buy(address token, uint256 paymentAmount, bytes32[] calldata proof, bool isWhitelist) external payable;
     function withdraw(address token, address to, uint256 amount) external;
 }
