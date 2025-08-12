@@ -15,8 +15,7 @@ interface ISellSoulboundNFT {
     }
 
     struct Batch {
-        uint256 startId;
-        uint256 endId;
+        uint256 totalSupply;
         string baseURI;
         uint256 minted;
     }
@@ -35,7 +34,7 @@ interface ISellSoulboundNFT {
     event WhitelistConfigSet(uint256 startTime, uint256 endTime, uint256 maxMint, bytes32 whitelistMerkleRoot);
     event PublicConfigSet(uint256 startTime, uint256 endTime);
     event Withdraw(address indexed token, address indexed to, uint256 amount);
-    event BatchCreated(uint256 indexed batchId, uint256 startId, uint256 endId, string baseURI);
+    event BatchCreated(uint256 indexed batchId, uint256 totalSupply, string baseURI);
     event NFTSold(
         address indexed buyer,
         uint256 indexed tokenId,
@@ -51,7 +50,7 @@ interface ISellSoulboundNFT {
     function removePaymentToken(address token) external;
     function setWhitelistConfig(WhitelistConfig calldata config) external;
     function setPublicConfig(PublicConfig calldata config) external;
-    function createBatch(uint256 startId, uint256 endId, string calldata baseURI) external;
+    function createBatch(uint256 totalSupply, string calldata baseURI) external;
     function buy(address token, uint256 paymentAmount, bytes32[] calldata proof, bool isWhitelist) external payable;
     function withdraw(address token, address to, uint256 amount) external;
 }

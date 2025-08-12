@@ -10,46 +10,46 @@ https://storage.googleapis.com/324d5927a3db8913-okzoo-plus-assets-dev/public/nft
 
 ### 1. SoulboundNFT Contract
 
-**Address:** `0xf34f5d3bB9B4940e38149AD982e26F95843A78A4`
+**Address:** `0xDc2AB787206Bf1d0f12696AFd15F561c73706251`
 
 #### Add Minter
 
 ```bash
-yarn hardhat write --contract SoulboundNFT --address 0xf34f5d3bB9B4940e38149AD982e26F95843A78A4 --method addMinter --args '["0x040b078E6Fb834a554aB739e23B43D1759C8A520"]' --network bscTestnet
+yarn hardhat write --contract SoulboundNFT --address 0xDc2AB787206Bf1d0f12696AFd15F561c73706251 --method addMinter --args '["0x0158848F1CD59d294128C58bDEc8cB4e68897130"]' --network bscTestnet
 ```
 
 ### 2. SellSoulboundNFT Contract
 
-**Address:** `0x040b078E6Fb834a554aB739e23B43D1759C8A520`
+**Address:** `0x0158848F1CD59d294128C58bDEc8cB4e68897130`
 
 #### Create Batch
 
 ```bash
-yarn hardhat write --contract SellSoulboundNFT --address 0x040b078E6Fb834a554aB739e23B43D1759C8A520 --method createBatch --args '[1,100,"https://storage.googleapis.com/324d5927a3db8913-okzoo-plus-assets-dev/public/nft/test/metadatas"]' --network bscTestnet
+yarn hardhat write --contract SellSoulboundNFT --address 0x0158848F1CD59d294128C58bDEc8cB4e68897130 --method createBatch --args '[100,"https://storage.googleapis.com/324d5927a3db8913-okzoo-plus-assets-dev/public/nft/test/metadatas"]' --network bscTestnet
 ```
 
 #### Set Public Config
 
 ```bash
-yarn hardhat write --contract SellSoulboundNFT --address 0x040b078E6Fb834a554aB739e23B43D1759C8A520 --method setPublicConfig --args '[{"startTime":"1754908608","endTime":"1757587008","price":"10000000000000000000"}]' --network bscTestnet
+yarn hardhat write --contract SellSoulboundNFT --address 0x0158848F1CD59d294128C58bDEc8cB4e68897130 --method setPublicConfig --args '[{"startTime":"1754908608","endTime":"1757587008"}]' --network bscTestnet
 ```
 
 #### Set Whitelist Config
 
 ```bash
-yarn hardhat write --contract SellSoulboundNFT --address 0x040b078E6Fb834a554aB739e23B43D1759C8A520 --method setWhitelistConfig --args '[{"startTime":"1753875879","endTime":"1756554279","price":"10000000000000000000","maxMint":10,"whitelistMerkleRoot":"0x3b0b19de8eb350ffb5a1d814ee419567a958f423ce482bef8523d35d4a53b177"}]' --network bscTestnet
+yarn hardhat write --contract SellSoulboundNFT --address 0x0158848F1CD59d294128C58bDEc8cB4e68897130 --method setWhitelistConfig --args '[{"startTime":"1753875879","endTime":"1756554279","maxMint":10,"whitelistMerkleRoot":"0x3b0b19de8eb350ffb5a1d814ee419567a958f423ce482bef8523d35d4a53b177"}]' --network bscTestnet
 ```
 
 #### Set Payment Token
 
 ```bash
-yarn hardhat write --contract SellSoulboundNFT --address 0x040b078E6Fb834a554aB739e23B43D1759C8A520 --method setPaymentToken --args '["0xbC89769Bb1E4BD614CD3F72D5c5ec282b4cd88Bf","15000000000000000000"]' --network bscTestnet
+yarn hardhat write --contract SellSoulboundNFT --address 0x0158848F1CD59d294128C58bDEc8cB4e68897130 --method setPaymentToken --args '["0x0216993204138d1d4019329b4E62dA9AB5aD6e85","10000000000000000000"]' --network bscTestnet
 ```
 
 #### Buy NFT
 
 ```bash
-yarn hardhat write --contract SellSoulboundNFT --address 0x040b078E6Fb834a554aB739e23B43D1759C8A520 --method buy --args '["0x0216993204138d1d4019329b4E62dA9AB5aD6e85","10000000000000000000",[],false]' --network bscTestnet
+yarn hardhat write --contract SellSoulboundNFT --address 0x0158848F1CD59d294128C58bDEc8cB4e68897130 --method buy --args '["0x0216993204138d1d4019329b4E62dA9AB5aD6e85","10000000000000000000",[],false]' --network bscTestnet
 ```
 
 ## Additional Commands
@@ -63,19 +63,19 @@ yarn hardhat write --contract OkzooToken --address 0x0216993204138d1d4019329b4E6
 ### Approve Token (Payment Token 1)
 
 ```bash
-yarn hardhat write --contract OkzooToken --address 0x0216993204138d1d4019329b4E62dA9AB5aD6e85 --method approve --args '["0x040b078E6Fb834a554aB739e23B43D1759C8A520","10000000000000000000"]' --network bscTestnet
+yarn hardhat write --contract OkzooToken --address 0x0216993204138d1d4019329b4E62dA9AB5aD6e85 --method approve --args '["0x0158848F1CD59d294128C58bDEc8cB4e68897130","10000000000000000000"]' --network bscTestnet
 ```
 
 ### Approve Token (Payment Token 2)
 
 ```bash
-yarn hardhat write --contract OkzooToken --address 0xbC89769Bb1E4BD614CD3F72D5c5ec282b4cd88Bf --method approve --args '["0x040b078E6Fb834a554aB739e23B43D1759C8A520","1000000000000000000000000"]' --network bscTestnet
+yarn hardhat write --contract OkzooToken --address 0xbC89769Bb1E4BD614CD3F72D5c5ec282b4cd88Bf --method approve --args '["0x0158848F1CD59d294128C58bDEc8cB4e68897130","1000000000000000000000000"]' --network bscTestnet
 ```
 
 ### Check Allowance
 
 ```bash
-yarn hardhat read --contract OkzooToken --address 0x0216993204138d1d4019329b4E62dA9AB5aD6e85 --method allowance --args '["0xYOUR_ADDRESS","0x040b078E6Fb834a554aB739e23B43D1759C8A520"]' --network bscTestnet
+yarn hardhat read --contract OkzooToken --address 0x0216993204138d1d4019329b4E62dA9AB5aD6e85 --method allowance --args '["0xYOUR_ADDRESS","0x0158848F1CD59d294128C58bDEc8cB4e68897130"]' --network bscTestnet
 ```
 
 ## Payment Tokens

@@ -8,6 +8,7 @@ import {ERC721URIStorage} from "@openzeppelin/contracts/token/ERC721/extensions/
 import {ERC721Burnable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 contract SoulboundNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Burnable, Ownable {
     uint256 private _nextTokenId = 1;
@@ -51,12 +52,13 @@ contract SoulboundNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Burna
         emit MinterRemoved(_minter);
     }
 
-    function safeMint(address to, string memory uri) public onlyMinter returns (uint256) {
+    function safeMint(address to, string memory baseURI) public onlyMinter returns (uint256) {
         require(to != address(0), "Soulbound: to is zero address");
         require(!hasMinted[to], "Soulbound: already minted");
 
         uint256 tokenId = _nextTokenId++;
         _safeMint(to, tokenId);
+        string memory uri = string(abi.encodePacked(baseURI, "/", Strings.toString(tokenId), ".json"));
         _setTokenURI(tokenId, uri);
 
         hasMinted[to] = true;

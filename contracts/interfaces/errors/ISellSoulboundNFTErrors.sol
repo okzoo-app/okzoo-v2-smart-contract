@@ -9,7 +9,7 @@ interface ISellSoulboundNFTErrors {
     error InvalidProof();
     error InvalidWhitelistConfig();
     error InvalidPublicConfig();
-    error InvalidBatch();
+    error InvalidTotalSupply();
     error InvalidMinted();
     error InvalidPayment();
     error InvalidPaymentToken();

@@ -66,8 +66,6 @@ contract SellSoulboundNFT is
 
     // Batches
     mapping(uint256 => Batch) public batches;
-    // Store lastEnd and check
-    uint256 public lastBatchEnd;
 
     // Whitelist minted
     uint256 public whitelistMinted;
@@ -170,19 +168,15 @@ contract SellSoulboundNFT is
     /**
      * @notice Creates a new batch.
      * @dev Only owner can create a new batch.
-     * @param startId The start token ID of the batch.
-     * @param endId The end token ID of the batch.
+     * @param totalSupply The total supply of the batch.
      * @param baseURI The base URI of the batch.
      */
-    function createBatch(uint256 startId, uint256 endId, string calldata baseURI) external onlyOwner {
-        require(endId >= startId, ISellSoulboundNFTErrors.InvalidRange());
-        require(startId > lastBatchEnd, ISellSoulboundNFTErrors.InvalidBatch());
-
+    function createBatch(uint256 totalSupply, string calldata baseURI) external onlyOwner {
+        require(totalSupply > 0, ISellSoulboundNFTErrors.InvalidTotalSupply());
         currentBatchId++;
-        batches[currentBatchId] = Batch(startId, endId, baseURI, 0);
-        lastBatchEnd = endId;
+        batches[currentBatchId] = Batch(totalSupply, baseURI, 0);
 
-        emit BatchCreated(currentBatchId, startId, endId, baseURI);
+        emit BatchCreated(currentBatchId, totalSupply, baseURI);
     }
 
     /**
@@ -239,16 +233,14 @@ contract SellSoulboundNFT is
      */
     function _mintNFT(address to, bool isWhitelist, address token, uint256 price) internal {
         Batch storage batch = batches[currentBatchId];
-        uint256 newTokenId = batch.startId + batch.minted;
-        require(newTokenId <= batch.endId, ISellSoulboundNFTErrors.InvalidBatch());
+        require(batch.minted < batch.totalSupply, ISellSoulboundNFTErrors.InvalidTotalSupply());
 
         if (isWhitelist) {
             require(whitelistMinted < whitelistConfig.maxMint, ISellSoulboundNFTErrors.InvalidMinted());
             whitelistMinted++;
         }
 
-        string memory uri = string(abi.encodePacked(batch.baseURI, "/", Strings.toString(newTokenId), ".json"));
-        uint256 tokenId = nft.safeMint(to, uri);
+        uint256 tokenId = nft.safeMint(to, batch.baseURI);
 
         minted[to] = Minted(currentBatchId, tokenId, to, token, price, block.timestamp);
         batch.minted++;
