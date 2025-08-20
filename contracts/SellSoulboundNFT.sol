@@ -97,7 +97,7 @@ contract SellSoulboundNFT is
      * @param token The address of the payment token.
      * @param price The price of the payment token.
      */
-    function setPaymentToken(address token, uint256 price) external onlyOwner {
+    function setPaymentToken(address token, uint256 price) external onlyOwner whenPaused {
         require(price > 0, "Price must be > 0");
         paymentTokenPrice[token] = price;
         emit PaymentTokenSet(token, price);
@@ -108,7 +108,7 @@ contract SellSoulboundNFT is
      * @dev Only owner can remove the payment token price.
      * @param token The address of the payment token.
      */
-    function removePaymentToken(address token) external onlyOwner {
+    function removePaymentToken(address token) external onlyOwner whenPaused {
         delete paymentTokenPrice[token];
         emit PaymentTokenSet(token, 0);
     }
@@ -145,7 +145,7 @@ contract SellSoulboundNFT is
      * @dev Only owner can set the whitelist config.
      * @param _whitelistConfig The whitelist config.
      */
-    function setWhitelistConfig(WhitelistConfig calldata _whitelistConfig) external onlyOwner {
+    function setWhitelistConfig(WhitelistConfig calldata _whitelistConfig) external onlyOwner whenPaused {
         whitelistConfig = _whitelistConfig;
         emit WhitelistConfigSet(
             _whitelistConfig.startTime,
@@ -160,7 +160,7 @@ contract SellSoulboundNFT is
      * @dev Only owner can set the public config.
      * @param _publicConfig The public config.
      */
-    function setPublicConfig(PublicConfig calldata _publicConfig) external onlyOwner {
+    function setPublicConfig(PublicConfig calldata _publicConfig) external onlyOwner whenPaused {
         publicConfig = _publicConfig;
         emit PublicConfigSet(_publicConfig.startTime, _publicConfig.endTime);
     }
@@ -171,7 +171,7 @@ contract SellSoulboundNFT is
      * @param totalSupply The total supply of the batch.
      * @param baseURI The base URI of the batch.
      */
-    function createBatch(uint256 totalSupply, string calldata baseURI) external onlyOwner {
+    function createBatch(uint256 totalSupply, string calldata baseURI) external onlyOwner whenPaused {
         require(totalSupply > 0, ISellSoulboundNFTErrors.InvalidTotalSupply());
         currentBatchId++;
         batches[currentBatchId] = Batch(totalSupply, baseURI, 0);
