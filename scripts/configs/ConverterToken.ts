@@ -1,3 +1,5 @@
+import { parseUnits } from "ethers";
+
 // Field order must be same with argument order in contract initializer function
 const config = {
     initialOwner: "0xe492BE5D1f9C0DA726C560Bc451835AfC5568313",
@@ -5,6 +7,7 @@ const config = {
     token: "0x0216993204138d1d4019329b4E62dA9AB5aD6e85",
     nft: "0x6a8f90954c1d1625eb267470741148573dad71a6",
     convertCooldown: 5 * 60, // 5 minutes
+    maxConvertOutAmount: parseUnits("1000", 18).toString(), // 1000 tokens
     domainName: "OkzooV2",
     signatureVersion: "1",
 };

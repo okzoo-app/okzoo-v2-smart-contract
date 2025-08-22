@@ -44,8 +44,11 @@ contract ConverterToken is
 
     uint256 public totalConvertedInAmount; // Total alpha tokens converted in
     uint256 public totalConvertedOutAmount; // Total actual tokens sent out
+    uint256 public maxConvertOutAmount; // Max actual tokens sent out per user
 
     mapping(address => Conversion[]) public conversionHistory; // Per-user history
+    mapping(address => uint256) public totalConvertedInAmountPerUser; // Total alpha tokens converted in per user
+    mapping(address => uint256) public totalConvertedOutAmountPerUser; // Total actual tokens sent out per user
     mapping(address => uint256) public nonces; // Per-user nonces for replay protection
 
     mapping(address => uint256) public lastConvertAt; // Last conversion timestamp for each user
@@ -70,6 +73,7 @@ contract ConverterToken is
         address _token,
         address _nft,
         uint256 _convertCooldown,
+        uint256 _maxConvertOutAmount,
         string memory _domainName,
         string memory _signatureVersion
     ) external initializer {
@@ -83,6 +87,9 @@ contract ConverterToken is
         nft = SoulboundNFT(_nft);
         verifier = _verifier;
         convertCooldown = _convertCooldown;
+        maxConvertOutAmount = _maxConvertOutAmount;
+        emit ConvertCooldownUpdated(0, _convertCooldown);
+        emit MaxConvertOutAmountUpdated(0, _maxConvertOutAmount);
     }
 
     // ====== Modifiers ======
@@ -151,6 +158,28 @@ contract ConverterToken is
         emit VerifierUpdated(verifier, newVerifier);
     }
 
+    /**
+     * @notice Updates the convert cooldown.
+     * @dev Only owner can update the convert cooldown.
+     * @param newConvertCooldown The new convert cooldown.
+     */
+    function updateConvertCooldown(uint256 newConvertCooldown) external onlyOwner {
+        require(newConvertCooldown > 0, IConverterTokenErrors.InvalidAmount());
+        convertCooldown = newConvertCooldown;
+        emit ConvertCooldownUpdated(convertCooldown, newConvertCooldown);
+    }
+
+    /**
+     * @notice Updates the max converted out amount.
+     * @dev Only owner can update the max converted out amount.
+     * @param newMaxConvertOutAmount The new max converted out amount.
+     */
+    function updateMaxConvertOutAmount(uint256 newMaxConvertOutAmount) external onlyOwner {
+        require(newMaxConvertOutAmount > 0, IConverterTokenErrors.InvalidAmount());
+        maxConvertOutAmount = newMaxConvertOutAmount;
+        emit MaxConvertOutAmountUpdated(maxConvertOutAmount, newMaxConvertOutAmount);
+    }
+
     // ====== Main Logic ======
 
     /**
@@ -173,6 +202,7 @@ contract ConverterToken is
         );
         require(amountIn > 0, IConverterTokenErrors.InvalidAmount());
         require(amountOut > 0, IConverterTokenErrors.InvalidAmount());
+        require(totalConvertedOutAmountPerUser[msg.sender] + amountOut <= maxConvertOutAmount, IConverterTokenErrors.MaxConvertOutAmountExceeded());
 
         require(
             verifyConvertRequest(
@@ -200,6 +230,8 @@ contract ConverterToken is
 
         totalConvertedInAmount += amountIn;
         totalConvertedOutAmount += amountOut;
+        totalConvertedInAmountPerUser[msg.sender] += amountIn;
+        totalConvertedOutAmountPerUser[msg.sender] += amountOut;
         lastConvertAt[msg.sender] = block.timestamp;
 
         emit Converted(msg.sender, amountIn, amountOut, convertId, block.timestamp);

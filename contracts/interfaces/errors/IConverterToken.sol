@@ -9,4 +9,5 @@ interface IConverterTokenErrors {
     error InsufficientBalance();
     error CooldownNotOver();
     error InvalidVerifier();
+    error MaxConvertOutAmountExceeded();
 }

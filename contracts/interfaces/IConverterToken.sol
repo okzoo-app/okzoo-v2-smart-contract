@@ -20,6 +20,8 @@ interface IConverterToken {
     event Converted(address indexed user, uint256 amountIn, uint256 amountOut, uint256 convertId, uint256 timestamp);
     event Withdraw(address indexed token, address indexed to, uint256 amount);
     event VerifierUpdated(address indexed oldVerifier, address indexed newVerifier);
+    event MaxConvertOutAmountUpdated(uint256 oldMaxConvertOutAmount, uint256 newMaxConvertOutAmount);
+    event ConvertCooldownUpdated(uint256 oldConvertCooldown, uint256 newConvertCooldown);
 
     function initialize(
         address _initialOwner,
@@ -27,6 +29,7 @@ interface IConverterToken {
         address _token,
         address _nft,
         uint256 _convertCooldown,
+        uint256 _maxConvertOutAmount,
         string memory _domainName,
         string memory _signatureVersion
     ) external;
@@ -34,6 +37,10 @@ interface IConverterToken {
     function withdraw(address _token, address to, uint256 amount) external;
 
     function updateVerifier(address newVerifier) external;
+
+    function updateConvertCooldown(uint256 newConvertCooldown) external;
+
+    function updateMaxConvertOutAmount(uint256 newMaxConvertOutAmount) external;
 
     function convert(
         uint256 amountIn,

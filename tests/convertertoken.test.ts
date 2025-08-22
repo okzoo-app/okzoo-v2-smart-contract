@@ -36,6 +36,7 @@ describe("ConverterToken", function () {
             await token.getAddress(),
             await nft.getAddress(),
             60, // cooldown
+            ethers.parseEther("1000"), // max convert out amount
             DOMAIN_NAME,
             DOMAIN_VERSION,
         );
