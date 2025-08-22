@@ -117,3 +117,100 @@ function logContractAction(args: any) {
     // Write updated contracts list back to file
     fs.writeFileSync(contractsFilePath, JSON.stringify(contracts, null, 2));
 }
+
+// Task: Call a read-only function
+task("call", "Call a read-only function")
+    .addParam("contract", "Contract name")
+    .addParam("address", "Contract address")
+    .addParam("method", "Method name")
+    .addParam("args", "JSON array of arguments")
+    .setAction(async (args, hre) => {
+        try {
+            const contract = await hre.ethers.getContractAt(args.contract, args.address);
+
+            // Check if the method exists on the contract
+            if (!(args.method in contract)) {
+                console.error(`Method '${args.method}' does not exist on contract '${args.contract}'`);
+                return;
+            }
+
+            const result = await contract[args.method as keyof typeof contract](...JSON.parse(args.args));
+            console.log("Result:", result);
+        } catch (error: unknown) {
+            const err = error as { code?: string; value?: string; message?: string };
+            if (err.code === "BAD_DATA" && err.value === "0x") {
+                console.error(`Method '${args.method}' returned empty data. This could mean:`);
+                console.error(`1. The method doesn't exist on the contract at address ${args.address}`);
+                console.error(`2. The method exists but returns no data`);
+                console.error(`3. The contract at ${args.address} is not a valid ${args.contract} contract`);
+            } else {
+                console.error("Error calling contract method:", err.message || "Unknown error");
+            }
+        }
+    });
+
+// Task: Call a write function (transaction)
+task("write", "Call a write function (transaction)")
+    .addParam("contract", "Contract name")
+    .addParam("address", "Contract address")
+    .addParam("method", "Method name")
+    .addParam("args", "JSON array of arguments")
+    .addOptionalParam("gasLimit", "Gas limit for the transaction", "3000000")
+    .addOptionalParam("gasPrice", "Gas price in wei", "auto")
+    .setAction(async (args, hre) => {
+        try {
+            const [signer] = await hre.ethers.getSigners();
+            const contract = await hre.ethers.getContractAt(args.contract, args.address, signer);
+
+            // Check if the method exists on the contract
+            if (!(args.method in contract)) {
+                console.error(`Method '${args.method}' does not exist on contract '${args.contract}'`);
+                return;
+            }
+
+            const parsedArgs = JSON.parse(args.args);
+            console.log(`Calling ${args.method} with args:`, parsedArgs);
+
+            // Prepare transaction options
+            const txOptions: { gasLimit: number; gasPrice?: bigint } = {
+                gasLimit: parseInt(args.gasLimit),
+            };
+
+            // Set gas price if specified
+            if (args.gasPrice !== "auto") {
+                txOptions.gasPrice = hre.ethers.parseUnits(args.gasPrice, "wei");
+            }
+
+            // Call the write function
+            const tx = await contract[args.method as keyof typeof contract](...parsedArgs, txOptions);
+            console.log(`Transaction hash: ${tx.hash}`);
+            console.log("Waiting for transaction confirmation...");
+
+            // Wait for transaction to be mined
+            const receipt = await tx.wait();
+            console.log(`Transaction confirmed in block ${receipt?.blockNumber}`);
+            console.log(`Gas used: ${receipt?.gasUsed?.toString()}`);
+
+            // Check if transaction was successful
+            if (receipt?.status === 1) {
+                console.log("✅ Transaction successful!");
+            } else {
+                console.log("❌ Transaction failed!");
+            }
+        } catch (error: unknown) {
+            const err = error as { code?: string; message?: string; reason?: string };
+
+            if (err.code === "INSUFFICIENT_FUNDS") {
+                console.error("❌ Insufficient funds for transaction");
+            } else if (err.code === "UNPREDICTABLE_GAS_LIMIT") {
+                console.error("❌ Gas limit too low or function call will revert");
+                console.error("Try increasing the gas limit or check if the function call is valid");
+            } else if (err.code === "NONCE_EXPIRED") {
+                console.error("❌ Nonce expired. Try again with a new transaction");
+            } else if (err.reason) {
+                console.error(`❌ Transaction reverted: ${err.reason}`);
+            } else {
+                console.error("❌ Error calling contract method:", err.message || "Unknown error");
+            }
+        }
+    });
