@@ -84,6 +84,7 @@ yarn hardhat read --contract OkzooToken --address 0x0216993204138d1d4019329b4E62
 -   **Payment Token 2:** `0xbC89769Bb1E4BD614CD3F72D5c5ec282b4cd88Bf`
 
 ## ConverterToken
+
 **Address:** 0x094497eB7AcAA9AB7b321e3a933d32539d523c49
 
 ## Merkle Proof Example
@@ -91,6 +92,7 @@ yarn hardhat read --contract OkzooToken --address 0x0216993204138d1d4019329b4E62
 ```
 [0xe56f74f0b5211ad1a2fa826c7feb2c59820ec31de047586f7ee465232ecc0ca5,0xc4fd3d13f71bcec4008a5bde2f2f2b0f01a79d5f6b39593be7c709af8d03bf5c,0xeea7f901206ea015e616b9ddac83e5a82b2c8b0af00db01e1df62413db13e810,0xc0c1f92c73b3a5feef3cdd524be08f61f49d609f22e3e48d99ac96de942e4ec6]
 ```
+
 // SoulboundNFT: 0x6a8f90954c1d1625eb267470741148573dad71a6
 // SellSoulboundNFT: 0xf64bc75c0c4103b62170431f7b3e948500313239
 // ConverterToken: 0x094497eB7AcAA9AB7b321e3a933d32539d523c49

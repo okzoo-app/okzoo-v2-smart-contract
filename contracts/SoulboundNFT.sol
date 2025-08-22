@@ -10,21 +10,38 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
-contract SoulboundNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Burnable, Ownable {
+interface ISoulboundNFTErrors {
+    error InvalidAddress();
+    error AlreadyMinter();
+    error AlreadyMinted();
+    error NotMinter();
+    error NotMinted();
+    error TokenIsNonTransferable();
+    error ApprovalNotAllowed();
+}
+
+contract SoulboundNFT is ISoulboundNFTErrors, ERC721, ERC721Enumerable, ERC721Burnable, Ownable {
     uint256 private _nextTokenId = 1;
     mapping(address => bool) public minters;
     mapping(address => bool) public hasMinted;
 
+    string public baseURI;
+
     // --- Events ---
     event MinterAdded(address indexed minter);
     event MinterRemoved(address indexed minter);
+    event BaseURIUpdated(string newBaseURI);
 
     constructor(
         string memory name,
         string memory symbol,
         address[] memory _minters,
-        address initialOwner
+        address initialOwner,
+        string memory _baseURI
     ) ERC721(name, symbol) Ownable(initialOwner) {
+        baseURI = _baseURI;
+        emit BaseURIUpdated(_baseURI);
+
         for (uint256 i = 0; i < _minters.length; i++) {
             minters[_minters[i]] = true;
             emit MinterAdded(_minters[i]);
@@ -32,34 +49,40 @@ contract SoulboundNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Burna
     }
 
     modifier onlyMinter() {
-        require(minters[msg.sender], "Soulbound: not a minter");
+        require(minters[msg.sender], ISoulboundNFTErrors.NotMinter());
         _;
+    }
+
+    // --- BaseURI Management ---
+    function setBaseURI(string memory _baseURI) external onlyOwner {
+        baseURI = _baseURI;
+        emit BaseURIUpdated(_baseURI);
     }
 
     // --- Minter Management ---
     function addMinter(address _minter) external onlyOwner {
-        require(_minter != address(0), "Invalid address");
-        require(!minters[_minter], "Already a minter");
+        require(_minter != address(0), ISoulboundNFTErrors.InvalidAddress());
+        require(!minters[_minter], ISoulboundNFTErrors.AlreadyMinter());
 
         minters[_minter] = true;
         emit MinterAdded(_minter);
     }
 
     function removeMinter(address _minter) external onlyOwner {
-        require(minters[_minter], "Not a minter");
+        require(minters[_minter], ISoulboundNFTErrors.NotMinter());
 
         minters[_minter] = false;
         emit MinterRemoved(_minter);
     }
 
-    function safeMint(address to, string memory baseURI) public onlyMinter returns (uint256) {
-        require(to != address(0), "Soulbound: to is zero address");
-        require(!hasMinted[to], "Soulbound: already minted");
+    function safeMint(address to) public onlyMinter returns (uint256) {
+        require(to != address(0), ISoulboundNFTErrors.InvalidAddress());
+        require(!hasMinted[to], ISoulboundNFTErrors.AlreadyMinted());
 
         uint256 tokenId = _nextTokenId++;
         _safeMint(to, tokenId);
-        string memory uri = string(abi.encodePacked(baseURI, "/", Strings.toString(tokenId), ".json"));
-        _setTokenURI(tokenId, uri);
+        // string memory uri = string(abi.encodePacked(baseURI, "/", Strings.toString(tokenId), ".json"));
+        // _setTokenURI(tokenId, uri);
 
         hasMinted[to] = true;
         return tokenId;
@@ -71,9 +94,11 @@ contract SoulboundNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Burna
         uint256 tokenId,
         address auth
     ) internal override(ERC721, ERC721Enumerable) returns (address) {
-        require(_ownerOf(tokenId) == address(0), "Soulbound: token is non-transferable");
-        require(to != address(0), "Soulbound: to is zero address");
-        require(minters[msg.sender], "Soulbound: only minter can mint");
+        address from = _ownerOf(tokenId);
+        require(from == address(0), ISoulboundNFTErrors.TokenIsNonTransferable());
+        require(to != address(0), ISoulboundNFTErrors.InvalidAddress());
+        require(minters[msg.sender], ISoulboundNFTErrors.NotMinter());
+        require(hasMinted[to], ISoulboundNFTErrors.NotMinted());
         return super._update(to, tokenId, auth);
     }
 
@@ -81,22 +106,21 @@ contract SoulboundNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Burna
         super._increaseBalance(account, value);
     }
 
-    function tokenURI(uint256 tokenId) public view override(ERC721, ERC721URIStorage) returns (string memory) {
-        return super.tokenURI(tokenId);
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        _requireOwned(tokenId);
+        return string(abi.encodePacked(baseURI, "/", Strings.toString(tokenId), ".json"));
     }
 
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view override(ERC721, ERC721Enumerable, ERC721URIStorage) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view override(ERC721, ERC721Enumerable) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 
     // --- Soulbound enforcement ---
     function approve(address, uint256) public pure override(ERC721, IERC721) {
-        revert("Soulbound: approval not allowed");
+        revert ISoulboundNFTErrors.ApprovalNotAllowed();
     }
 
     function setApprovalForAll(address, bool) public pure override(ERC721, IERC721) {
-        revert("Soulbound: approval not allowed");
+        revert ISoulboundNFTErrors.ApprovalNotAllowed();
     }
 }

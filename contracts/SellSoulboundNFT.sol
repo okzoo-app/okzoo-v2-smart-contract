@@ -169,14 +169,13 @@ contract SellSoulboundNFT is
      * @notice Creates a new batch.
      * @dev Only owner can create a new batch.
      * @param totalSupply The total supply of the batch.
-     * @param baseURI The base URI of the batch.
      */
-    function createBatch(uint256 totalSupply, string calldata baseURI) external onlyOwner whenPaused {
+    function createBatch(uint256 totalSupply) external onlyOwner whenPaused {
         require(totalSupply > 0, ISellSoulboundNFTErrors.InvalidTotalSupply());
         currentBatchId++;
-        batches[currentBatchId] = Batch(totalSupply, baseURI, 0);
+        batches[currentBatchId] = Batch(totalSupply, 0);
 
-        emit BatchCreated(currentBatchId, totalSupply, baseURI);
+        emit BatchCreated(currentBatchId, totalSupply);
     }
 
     /**
@@ -240,7 +239,7 @@ contract SellSoulboundNFT is
             whitelistMinted++;
         }
 
-        uint256 tokenId = nft.safeMint(to, batch.baseURI);
+        uint256 tokenId = nft.safeMint(to);
 
         minted[to] = Minted(currentBatchId, tokenId, to, token, price, block.timestamp);
         batch.minted++;

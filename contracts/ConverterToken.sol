@@ -202,7 +202,10 @@ contract ConverterToken is
         );
         require(amountIn > 0, IConverterTokenErrors.InvalidAmount());
         require(amountOut > 0, IConverterTokenErrors.InvalidAmount());
-        require(totalConvertedOutAmountPerUser[msg.sender] + amountOut <= maxConvertOutAmount, IConverterTokenErrors.MaxConvertOutAmountExceeded());
+        require(
+            totalConvertedOutAmountPerUser[msg.sender] + amountOut <= maxConvertOutAmount,
+            IConverterTokenErrors.MaxConvertOutAmountExceeded()
+        );
 
         require(
             verifyConvertRequest(
