@@ -98,7 +98,6 @@ contract SoulboundNFT is ISoulboundNFTErrors, ERC721, ERC721Enumerable, ERC721Bu
         require(from == address(0), ISoulboundNFTErrors.TokenIsNonTransferable());
         require(to != address(0), ISoulboundNFTErrors.InvalidAddress());
         require(minters[msg.sender], ISoulboundNFTErrors.NotMinter());
-        require(hasMinted[to], ISoulboundNFTErrors.NotMinted());
         return super._update(to, tokenId, auth);
     }
 

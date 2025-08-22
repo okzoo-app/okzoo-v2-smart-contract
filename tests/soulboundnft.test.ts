@@ -29,7 +29,7 @@ describe("SellSoulboundNFT", function () {
 
         // Deploy Soulbound NFT
         const NFT = await ethers.getContractFactory("SoulboundNFT");
-        nft = await NFT.deploy("Soulbound", "SBT", [owner.address], owner.address);
+        nft = await NFT.deploy("Soulbound", "SBT", [owner.address], owner.address, "ipfs://baseURI");
 
         const nftAddress = await nft.getAddress();
         paymentToken1Address = await paymentToken1.getAddress();
@@ -45,14 +45,17 @@ describe("SellSoulboundNFT", function () {
         // Grant mint role to contract
         await nft.connect(owner).addMinter(contractAddress);
 
-        // Create batch
-        await contract.connect(owner).createBatch(1, 10, "ipfs://baseURI");
-
-        // Setup whitelist
         whitelistAddresses = [user1.address, owner.address];
         merkleTree = buildTree(whitelistAddresses);
         merkleRoot = merkleTree.root;
 
+        // Pause contract
+        await contract.connect(owner).pause();
+
+        // Create batch
+        await contract.connect(owner).createBatch(10);
+
+        // Setup whitelist
         await contract.connect(owner).setWhitelistConfig({
             whitelistMerkleRoot: merkleRoot,
             startTime: Math.floor(Date.now() / 1000) - 100,
@@ -60,6 +63,7 @@ describe("SellSoulboundNFT", function () {
             maxMint: 3,
         });
 
+        // Setup public config
         await contract.connect(owner).setPublicConfig({
             startTime: Math.floor(Date.now() / 1000) - 100,
             endTime: Math.floor(Date.now() / 1000) + 3600,
@@ -67,6 +71,9 @@ describe("SellSoulboundNFT", function () {
 
         await contract.connect(owner).setPaymentToken(paymentToken1Address, ethers.parseEther("10"));
         await contract.connect(owner).setPaymentToken(paymentToken2Address, ethers.parseEther("15"));
+
+        // Unpause contract
+        await contract.connect(owner).unpause();
 
         // await paymentToken1.connect(owner).transfer(user1.address, ethers.parseEther("1000"));
         // await paymentToken2.connect(owner).transfer(user2.address, ethers.parseEther("1000"));
